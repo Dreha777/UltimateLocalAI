@@ -54,7 +54,7 @@ jobs:
         with:
           cuda: '12.8.1'
           method: 'network'
-          sub-packages: '["nvcc", "cudart", "cublas", "nvrtc"]'
+          sub-packages: '["nvcc", "cudart", "cublas", "nvrtc", "visual_studio_integration"]'
 
       - name: Environment diagnostics
         shell: pwsh
