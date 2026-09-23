@@ -1,0 +1,166 @@
+name: Build Windows Portable
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**/*.md'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Windows x64 portable
+    runs-on: windows-2022
+    timeout-minutes: 240
+
+    steps:
+      - name: Checkout Ultimate Local AI
+        uses: actions/checkout@v4
+
+      # Стабильная версия llama.cpp.
+      # Используем для Xeon E3-1270, i7-6700 и GTX 1050 Pascal.
+      - name: Checkout llama.cpp stable b11060
+        uses: actions/checkout@v4
+        with:
+          repository: ggml-org/llama.cpp
+          ref: b11060
+          path: vendor/llama-stable
+          fetch-depth: 1
+
+      # Самая свежая версия llama.cpp.
+      # Нужна для поддержки новых GGUF-моделей и архитектур.
+      - name: Checkout latest llama.cpp
+        uses: actions/checkout@v4
+        with:
+          repository: ggml-org/llama.cpp
+          ref: master
+          path: vendor/llama-latest
+          fetch-depth: 1
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # CUDA 12.x нужна для Pascal GTX 1050 (sm_61).
+      # Физическая NVIDIA-карта на GitHub runner не требуется.
+      - name: Install CUDA Toolkit 12.8.1
+        uses: Jimver/cuda-toolkit@v0.2.36
+        id: cuda-toolkit
+        with:
+          cuda: '12.8.1'
+          method: 'network'
+          sub-packages: '["nvcc", "cudart", "cublas", "nvrtc"]'
+
+      - name: Environment diagnostics
+        shell: pwsh
+        run: |
+          Write-Host "===== DOTNET ====="
+          dotnet --info
+
+          Write-Host "===== CMAKE ====="
+          cmake --version
+
+          Write-Host "===== CUDA ====="
+          nvcc --version
+
+          Write-Host "CUDA_PATH=$env:CUDA_PATH"
+
+          Write-Host "===== MSVC ====="
+          Get-Command cl.exe -ErrorAction SilentlyContinue
+
+      - name: Check project files
+        shell: pwsh
+        run: |
+          $required = @(
+            "src/UltimateLocalAI/UltimateLocalAI.csproj",
+            "scripts/Build-GitHub.ps1",
+            "FIRST_START_RU.txt",
+            "THIRD_PARTY_NOTICES.md",
+            "vendor/llama-stable/CMakeLists.txt",
+            "vendor/llama-latest/CMakeLists.txt"
+          )
+
+          foreach ($file in $required) {
+            if (-not (Test-Path $file)) {
+              throw "Required file not found: $file"
+            }
+            Write-Host "OK: $file"
+          }
+
+      - name: Build GUI and llama.cpp runtimes
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy -Scope Process Bypass -Force
+          ./scripts/Build-GitHub.ps1
+
+      - name: Smoke-check portable package
+        shell: pwsh
+        run: |
+          $root = "dist/UltimateLocalAI-Portable"
+
+          $required = @(
+            "$root/UltimateLocalAI.exe",
+
+            "$root/backends/stable/cpu-avx/llama-server.exe",
+            "$root/backends/stable/cpu-avx2/llama-server.exe",
+            "$root/backends/stable/cuda-pascal-avx/llama-server.exe",
+
+            "$root/backends/latest/cpu-avx/llama-server.exe",
+            "$root/backends/latest/cpu-avx2/llama-server.exe",
+            "$root/backends/latest/cuda-pascal-avx/llama-server.exe"
+          )
+
+          foreach ($file in $required) {
+            if (-not (Test-Path $file)) {
+              throw "Missing required artifact: $file"
+            }
+
+            $size = (Get-Item $file).Length
+            Write-Host "OK: $file ($size bytes)"
+          }
+
+          Write-Host ""
+          Write-Host "===== BACKENDS ====="
+          Get-ChildItem "$root/backends" -Recurse -Filter llama-server.exe |
+            Select-Object FullName, Length
+
+      - name: Create ZIP
+        shell: pwsh
+        run: |
+          $source = "dist/UltimateLocalAI-Portable"
+          $zip = "dist/UltimateLocalAI-Portable.zip"
+
+          if (Test-Path $zip) {
+            Remove-Item $zip -Force
+          }
+
+          Compress-Archive `
+            -Path "$source/*" `
+            -DestinationPath $zip `
+            -CompressionLevel Optimal
+
+          Write-Host "Created: $zip"
+          Get-Item $zip | Select-Object Name, Length
+
+      - name: Upload portable folder
+        uses: actions/upload-artifact@v4
+        with:
+          name: UltimateLocalAI-Portable
+          path: dist/UltimateLocalAI-Portable/**
+          if-no-files-found: error
+          compression-level: 6
+          retention-days: 30
+
+      - name: Upload ready ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: UltimateLocalAI-Portable-ZIP
+          path: dist/UltimateLocalAI-Portable.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
