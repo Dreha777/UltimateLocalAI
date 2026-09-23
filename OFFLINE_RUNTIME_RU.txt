@@ -1,0 +1,23 @@
+ULTIMATE LOCAL AI — ЧТО НУЖНО НА ЦЕЛЕВОМ ПК
+
+После успешного BUILD.cmd portable-папка dist\UltimateLocalAI-Portable должна содержать:
+- UltimateLocalAI.exe и self-contained .NET runtime;
+- backends\cpu-avx — Xeon E3-1270 / AVX;
+- backends\cpu-avx2 — i7-6700 и более новые AVX2 CPU;
+- при сборке с CUDA 12.x: backends\cuda-pascal-avx с llama-server и необходимыми CUDA runtime DLL.
+
+На целевом ПК НЕ НУЖНЫ:
+- LM Studio;
+- отдельная установка llama.cpp;
+- Visual Studio;
+- .NET SDK/runtime;
+- CMake;
+- CUDA Toolkit.
+
+Для GPU-ускорения НУЖЕН установленный системный NVIDIA display driver.
+Его нельзя заменить DLL-файлом рядом с программой: это системный драйвер Windows.
+Если драйвера нет/он несовместим, Ultimate Local AI должен использовать CPU backend.
+
+LM Studio:
+LM Studio может иметь собственные llama.cpp Runtime Extension Packs, но Ultimate Local AI намеренно их не использует.
+Это исключает зависимость от версии/внутренних путей LM Studio.

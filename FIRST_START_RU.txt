@@ -1,0 +1,16 @@
+ULTIMATE LOCAL AI PORTABLE v1.2 — ПЕРВЫЙ ЗАПУСК
+
+1. Запустите UltimateLocalAI.exe.
+2. Нажмите «Выбрать GGUF» и укажите модель.
+3. Backend оставьте «Auto».
+4. Для Xeon E3-1270 + GTX 1050 2 GB начните с Context 4096.
+5. Нажмите «Запустить модель».
+
+Автовыбор:
+- GTX 1050/Pascal + Xeon AVX -> cuda-pascal-avx, если он собран;
+- иначе -> cpu-avx;
+- i7-6700 без GPU -> cpu-avx2.
+
+Если CUDA backend не стартует и включён fallback, GUI автоматически попробует CPU backend.
+Логи: Logs\localai_YYYYMMDD.log
+Чаты: Data\chats.json

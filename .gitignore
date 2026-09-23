@@ -1,0 +1,13 @@
+.vs/
+bin/
+obj/
+build/
+build-ci/
+dist/
+backends/
+Data/
+Logs/
+vendor/llama-stable/
+vendor/llama-latest/
+*.user
+*.suo
