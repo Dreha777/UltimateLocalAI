@@ -9,10 +9,14 @@ $Out = Join-Path $Root 'dist\UltimateLocalAI-Portable'
 $BackendsOut = Join-Path $Out 'backends'
 $BuildRoot = Join-Path $Root 'build-ci'
 
-function Run([string]$Exe, [string[]]$Args) {
-    Write-Host "> $Exe $($Args -join ' ')" -ForegroundColor DarkGray
-    & $Exe @Args
-    if ($LASTEXITCODE -ne 0) { throw "$Exe exited with code $LASTEXITCODE" }
+function Run([string]$Exe, [string[]]$Arguments) {
+    Write-Host "> $Exe $($Arguments -join ' ')" -ForegroundColor DarkGray
+
+    & $Exe @Arguments
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Exe exited with code $LASTEXITCODE"
+    }
 }
 
 function Copy-CudaRuntime([string]$Dest) {
