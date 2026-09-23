@@ -1,0 +1,180 @@
+<Window x:Class="UltimateLocalAI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="Ultimate Local AI" Width="1280" Height="820" MinWidth="980" MinHeight="650"
+        WindowStartupLocation="CenterScreen" WindowStyle="None" Background="#F5F5F7">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="42" ResizeBorderThickness="7" CornerRadius="12" GlassFrameThickness="0" UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
+
+    <Grid Background="{StaticResource BgBrush}">
+        <Grid.RowDefinitions><RowDefinition Height="42"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+
+        <!-- Title bar -->
+        <Grid Grid.Row="0" Background="#F5F5F7" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="260"/><ColumnDefinition Width="*"/><ColumnDefinition Width="150"/></Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                <Ellipse Width="11" Height="11" Fill="#FF5F57" Margin="0,0,7,0"/>
+                <Ellipse Width="11" Height="11" Fill="#FEBC2E" Margin="0,0,7,0"/>
+                <Ellipse Width="11" Height="11" Fill="#28C840" Margin="0,0,12,0"/>
+                <TextBlock Text="Ultimate Local AI" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center"/>
+            </StackPanel>
+            <TextBlock Grid.Column="1" x:Name="TitleStatusText" Text="Готов к выбору модели" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12"/>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="—" Width="46" Height="42" Background="Transparent" BorderThickness="0" Click="Minimize_Click"/>
+                <Button Content="▢" Width="46" Height="42" Background="Transparent" BorderThickness="0" Click="Maximize_Click"/>
+                <Button Content="×" Width="46" Height="42" Background="Transparent" BorderThickness="0" Click="Close_Click"/>
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="252"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+
+            <!-- Sidebar -->
+            <Border Grid.Column="0" Background="{StaticResource SidebarBrush}" CornerRadius="0,16,0,0" Padding="12">
+                <Grid>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <StackPanel>
+                        <Button Style="{StaticResource AccentButton}" Content="＋  Новый чат" HorizontalContentAlignment="Left" Click="NewChat_Click" Margin="0,4,0,12"/>
+                        <TextBlock Text="ЧАТЫ" FontSize="10" FontWeight="Bold" Foreground="{StaticResource MutedBrush}" Margin="8,4,0,6"/>
+                    </StackPanel>
+                    <ListBox Grid.Row="1" x:Name="ChatsList" ItemsSource="{Binding Chats}" SelectionChanged="ChatsList_SelectionChanged"
+                             Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="0,2"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Style.Triggers><Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="#DDE8F8"/></Trigger></Style.Triggers>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="10,9" CornerRadius="9" Background="Transparent">
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding UpdatedAt, StringFormat={}{0:dd.MM HH:mm}}" FontSize="10" Foreground="{StaticResource MutedBrush}" Margin="0,3,0,0"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="⋯" Width="26" Height="26" Background="Transparent" BorderThickness="0" Click="ChatMenu_Click" ToolTip="Переименовать или удалить"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <StackPanel Grid.Row="2">
+                        <Button Style="{StaticResource SoftButton}" Content="▤  База знаний" HorizontalContentAlignment="Left" Click="Knowledge_Click" Margin="0,6,0,6"/>
+                        <Border Background="#FFFFFF" CornerRadius="12" Padding="10" BorderBrush="#D8D8DE" BorderThickness="1">
+                            <StackPanel>
+                                <TextBlock Text="ЭТОТ КОМПЬЮТЕР" FontSize="9" FontWeight="Bold" Foreground="{StaticResource MutedBrush}"/>
+                                <TextBlock x:Name="HardwareText" Text="Определение…" FontSize="11" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Main content -->
+            <Grid Grid.Column="1" Margin="16,0,16,14">
+                <Grid.RowDefinitions><RowDefinition Height="64"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="30"/></Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock x:Name="ModelNameText" Text="Модель не выбрана" FontSize="17" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="BackendText" Text="Выберите GGUF-файл" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Style="{StaticResource SoftButton}" Content="Выбрать GGUF" Click="SelectModel_Click" Margin="0,0,8,0"/>
+                        <Button x:Name="StartButton" Style="{StaticResource AccentButton}" Content="Запустить" Click="StartModel_Click" Margin="0,0,8,0"/>
+                        <Button Style="{StaticResource SoftButton}" Content="⚙" FontSize="17" Width="42" Click="Settings_Click" ToolTip="Настройки модели"/>
+                    </StackPanel>
+                </Grid>
+
+                <Border Grid.Row="1" Background="#ECECF1" CornerRadius="16" Padding="1" BorderBrush="#E2E2E7" BorderThickness="1">
+                    <ScrollViewer x:Name="ChatScroll" VerticalScrollBarVisibility="Auto" Padding="18">
+                        <ItemsControl ItemsSource="{Binding Messages}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel HorizontalAlignment="{Binding Role, Converter={StaticResource RoleToAlignment}}" MaxWidth="760" Margin="0,7">
+                                        <TextBlock Text="{Binding Role, Converter={StaticResource RoleToLabel}}" FontSize="10" Foreground="{StaticResource MutedBrush}" Margin="8,0,8,4"/>
+                                        <Border Background="{Binding Role, Converter={StaticResource RoleToBrush}}" CornerRadius="15" Padding="14,11">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Content}" Foreground="{Binding Role, Converter={StaticResource RoleToForeground}}" FontSize="14" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding AttachmentSummary}" Foreground="#B8D8FF" FontSize="10" TextWrapping="Wrap" Margin="0,7,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Border>
+
+                <!-- Composer -->
+                <Border Grid.Row="2" Background="White" CornerRadius="16" Margin="0,12,0,8" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="10">
+                    <Grid>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <ItemsControl x:Name="AttachmentList" ItemsSource="{Binding PendingAttachments}" Margin="2,0,2,6">
+                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate><DataTemplate><Border Background="#EEF5FF" CornerRadius="9" Padding="8,4" Margin="0,0,6,4"><TextBlock Text="{Binding FileName}" FontSize="10"/></Border></DataTemplate></ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/><ColumnDefinition Width="52"/></Grid.ColumnDefinitions>
+                            <Button Content="＋" FontSize="20" Width="36" Height="36" Background="Transparent" BorderThickness="0" Click="Attach_Click" ToolTip="Прикрепить PDF, DOCX, XLSX, TXT или исходный код"/>
+                            <TextBox Grid.Column="1" x:Name="PromptBox" MinHeight="44" MaxHeight="130" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" BorderThickness="0" Background="Transparent" PreviewKeyDown="PromptBox_PreviewKeyDown" ToolTip="Enter — отправить, Shift+Enter — новая строка"/>
+                            <Button Grid.Column="2" x:Name="SendButton" Style="{StaticResource AccentButton}" Content="➤" Width="42" Height="38" Click="Send_Click" IsEnabled="False"/>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <Grid Grid.Row="3">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <TextBlock x:Name="RuntimeStatusText" Text="Backend не запущен" FontSize="10" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" x:Name="PerfText" Text="" FontSize="10" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center"/>
+                </Grid>
+            </Grid>
+
+            <!-- Settings drawer -->
+            <Border x:Name="SettingsPanel" Grid.Column="1" Width="450" HorizontalAlignment="Right" Background="#FAFAFC" BorderBrush="#D8D8DE" BorderThickness="1,0,0,0" Visibility="Collapsed" Panel.ZIndex="20">
+                <Grid>
+                    <Grid.RowDefinitions><RowDefinition Height="58"/><RowDefinition Height="*"/><RowDefinition Height="64"/></Grid.RowDefinitions>
+                    <Grid Margin="18,0"><TextBlock Text="Настройки модели" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/><Button Content="×" Width="36" Height="36" HorizontalAlignment="Right" Background="Transparent" BorderThickness="0" FontSize="20" Click="CloseSettings_Click"/></Grid>
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="18,0,18,12">
+                        <StackPanel>
+                            <TextBlock Text="ЗАПУСК И ПАМЯТЬ" FontSize="10" FontWeight="Bold" Foreground="{StaticResource MutedBrush}" Margin="0,4,0,8"/>
+                            <TextBlock Text="Runtime llama.cpp" FontWeight="SemiBold"/><TextBlock Text="Stable — проверенная b11060. Latest — свежая сборка для новых GGUF-архитектур. Custom — собственная папка runtime. Переключение runtime не удаляет чаты и модели." FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,2,0,5"/>
+                            <ComboBox x:Name="RuntimeChannelBox" ItemsSource="{Binding RuntimeChannels}"/>
+                            <TextBlock Text="Путь Custom runtime" FontWeight="SemiBold" Margin="0,10,0,0"/><TextBlock Text="Укажите папку, содержащую подпапки cpu-avx / cpu-avx2 / cuda-pascal-avx и т.п. Для Stable/Latest поле игнорируется." FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/><TextBox x:Name="CustomRuntimePathBox"/>
+                            <TextBlock Text="Backend" FontWeight="SemiBold" Margin="0,13,0,0"/><TextBlock Text="Авто выбирает AVX/AVX2/CUDA по железу. Xeon E3-1270 + GTX 1050 использует отдельный CUDA Pascal sm_61 backend." FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,2,0,5"/>
+                            <ComboBox x:Name="BackendModeBox" ItemsSource="{Binding BackendModes}"/>
+
+                            <TextBlock Text="Размер контекста" FontWeight="SemiBold" Margin="0,13,0,0"/><TextBlock Text="Сколько токенов модель может держать в текущем диалоге. Больше = больше RAM и медленнее обработка." FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/><TextBox x:Name="ContextBox"/>
+                            <TextBlock Text="Потоки CPU" FontWeight="SemiBold" Margin="0,13,0,0"/><TextBlock Text="Потоки во время генерации. На старых 4C/8T часто быстрее 4–6, а не обязательно 8." FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/><TextBox x:Name="ThreadsBox"/>
+                            <TextBlock Text="Потоки обработки промпта" FontWeight="SemiBold" Margin="0,13,0,0"/><TextBlock Text="Используются при загрузке текста в контекст; обычно можно ставить все логические потоки." FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/><TextBox x:Name="ThreadsBatchBox"/>
+                            <TextBlock Text="Слои на GPU" FontWeight="SemiBold" Margin="0,13,0,0"/><TextBlock Text="auto — llama.cpp подбирает сам. На GTX 1050 2 ГБ лучше начинать с auto; при нехватке VRAM уменьшить." FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/><TextBox x:Name="GpuLayersBox"/>
+                            <TextBlock Text="Batch / Micro-batch" FontWeight="SemiBold" Margin="0,13,0,0"/><TextBlock Text="Влияют главным образом на скорость обработки промпта и расход памяти. Для 16 ГБ безопасный старт 512 / 256." FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/>
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition/></Grid.ColumnDefinitions><TextBox x:Name="BatchBox"/><TextBox Grid.Column="2" x:Name="UBatchBox"/></Grid>
+                            <TextBlock Text="Flash Attention" FontWeight="SemiBold" Margin="0,13,0,0"/><TextBlock Text="auto — рекомендуемый режим. Поддержка зависит от модели и backend." FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/><ComboBox x:Name="FlashBox"><ComboBoxItem Content="auto"/><ComboBoxItem Content="on"/><ComboBoxItem Content="off"/></ComboBox>
+                            <TextBlock Text="KV-кэш K / V" FontWeight="SemiBold" Margin="0,13,0,0"/><TextBlock Text="q8_0 экономит память относительно f16 при обычно небольшом влиянии на качество. Если модель ведёт себя странно — вернуть f16." FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/>
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition/></Grid.ColumnDefinitions><ComboBox x:Name="CacheKBox" ItemsSource="{Binding CacheTypes}"/><ComboBox Grid.Column="2" x:Name="CacheVBox" ItemsSource="{Binding CacheTypes}"/></Grid>
+                            <TextBlock Text="Режим рассуждений" FontWeight="SemiBold" Margin="0,13,0,0"/><TextBlock Text="auto использует возможности шаблона модели; on принудительно включает thinking, off отключает его, если модель и шаблон это поддерживают." FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/>
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition/></Grid.ColumnDefinitions><ComboBox x:Name="ReasoningModeBox"><ComboBoxItem Content="auto"/><ComboBoxItem Content="on"/><ComboBoxItem Content="off"/></ComboBox><ComboBox Grid.Column="2" x:Name="ReasoningEffortBox"><ComboBoxItem Content="default"/><ComboBoxItem Content="minimal"/><ComboBoxItem Content="low"/><ComboBoxItem Content="medium"/><ComboBoxItem Content="high"/><ComboBoxItem Content="xhigh"/><ComboBoxItem Content="max"/></ComboBox></Grid>
+
+                            <TextBlock Text="ГЕНЕРАЦИЯ" FontSize="10" FontWeight="Bold" Foreground="{StaticResource MutedBrush}" Margin="0,22,0,8"/>
+                            <TextBlock Text="Температура" FontWeight="SemiBold"/><TextBlock Text="Ниже — точнее и стабильнее; выше — разнообразнее. Для кода и анализа обычно 0,2–0,7." FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/><TextBox x:Name="TemperatureBox"/>
+                            <TextBlock Text="Top P / Top K / Min P" FontWeight="SemiBold" Margin="0,13,0,0"/><TextBlock Text="Фильтры выбора следующего токена. Если не знаете — оставьте 0,95 / 40 / 0,05." FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/>
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="7"/><ColumnDefinition/><ColumnDefinition Width="7"/><ColumnDefinition/></Grid.ColumnDefinitions><TextBox x:Name="TopPBox"/><TextBox Grid.Column="2" x:Name="TopKBox"/><TextBox Grid.Column="4" x:Name="MinPBox"/></Grid>
+                            <TextBlock Text="Штраф за повторы" FontWeight="SemiBold" Margin="0,13,0,0"/><TextBlock Text="Помогает уменьшить зацикливание. Обычно 1,0–1,15." FontSize="11" Foreground="{StaticResource MutedBrush}"/><TextBox x:Name="RepeatPenaltyBox"/>
+                            <TextBlock Text="Максимум новых токенов" FontWeight="SemiBold" Margin="0,13,0,0"/><TextBlock Text="Ограничивает длину одного ответа, а не общий контекст." FontSize="11" Foreground="{StaticResource MutedBrush}"/><TextBox x:Name="MaxTokensBox"/>
+                            <TextBlock Text="Seed" FontWeight="SemiBold" Margin="0,13,0,0"/><TextBlock Text="-1 — случайный. Фиксированное число помогает повторять результат при одинаковых настройках." FontSize="11" Foreground="{StaticResource MutedBrush}"/><TextBox x:Name="SeedBox"/>
+                            <TextBlock Text="Системная инструкция" FontWeight="SemiBold" Margin="0,13,0,0"/><TextBlock Text="Постоянная инструкция модели в начале каждого чата." FontSize="11" Foreground="{StaticResource MutedBrush}"/><TextBox x:Name="SystemPromptBox" Height="105" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+                            <CheckBox x:Name="KnowledgeCheck" Content="Автоматически использовать локальную базу знаний" Margin="0,16,0,0"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                    <Grid Grid.Row="2" Margin="18,10"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition/></Grid.ColumnDefinitions><Button Style="{StaticResource SoftButton}" Content="Сбросить" Click="ResetSettings_Click"/><Button Grid.Column="2" Style="{StaticResource SoftButton}" Content="Тест скорости" Click="Benchmark_Click"/><Button Grid.Column="4" Style="{StaticResource AccentButton}" Content="Применить" Click="SaveSettings_Click"/></Grid>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

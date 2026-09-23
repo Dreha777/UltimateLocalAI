@@ -1,0 +1,16 @@
+<Window x:Class="UltimateLocalAI.KnowledgeBaseWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Локальная база знаний" Width="760" Height="540" WindowStartupLocation="CenterOwner" Background="#F5F5F7">
+    <Grid Margin="18">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <TextBlock Text="Локальная база знаний" FontSize="22" FontWeight="SemiBold"/>
+        <TextBlock Grid.Row="1" Text="Файлы индексируются локально. В чат передаются только наиболее подходящие фрагменты; Интернет не используется." TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,14"/>
+        <ListBox Grid.Row="2" x:Name="DocsList" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="White">
+            <ListBox.ItemTemplate>
+                <DataTemplate><Grid Margin="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold"/><TextBlock Text="{Binding SourcePath}" FontSize="10" Foreground="{StaticResource MutedBrush}" TextTrimming="CharacterEllipsis"/></StackPanel><TextBlock Grid.Column="1" Text="{Binding IndexedAt, StringFormat={}{0:dd.MM.yyyy HH:mm}}" FontSize="10" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center"/></Grid></DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+        <Grid Grid.Row="3" Margin="0,14,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="8"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Name="StatusText" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}"/><Button Grid.Column="1" Style="{StaticResource SoftButton}" Content="Удалить выбранный" Click="Remove_Click"/><Button Grid.Column="3" Style="{StaticResource AccentButton}" Content="Добавить файлы" Click="Add_Click"/></Grid>
+    </Grid>
+</Window>

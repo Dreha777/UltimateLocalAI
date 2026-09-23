@@ -1,0 +1,15 @@
+<Window x:Class="UltimateLocalAI.TextPromptWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Width="420" Height="190" WindowStartupLocation="CenterOwner" ResizeMode="NoResize" WindowStyle="ToolWindow" Background="#F5F5F7">
+    <Grid Margin="20">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <TextBlock x:Name="HeaderText" FontSize="17" FontWeight="SemiBold"/>
+        <TextBlock Grid.Row="1" x:Name="DescriptionText" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,10"/>
+        <TextBox Grid.Row="2" x:Name="ValueBox" VerticalAlignment="Top"/>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+            <Button Style="{StaticResource SoftButton}" Content="Отмена" Width="95" IsCancel="True" Margin="0,0,8,0"/>
+            <Button Style="{StaticResource AccentButton}" Content="Сохранить" Width="105" IsDefault="True" Click="Save_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
