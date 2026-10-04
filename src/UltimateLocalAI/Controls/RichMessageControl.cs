@@ -342,7 +342,7 @@ public sealed class RichMessageControl : UserControl
 
     private static void AddHighlightedCode(TextBlock target, string code, string language)
     {
-        var regex = new Regex(@"(?<comment>//[^\r\n]*|#[^\r\n]*|/\*[\s\S]*?\*/)|(?<string>@?""(?:""""|\\"|[^""])*""|'(?:\\'|[^'])*')|(?<number>\b\d+(?:\.\d+)?\b)|(?<word>\b[A-Za-z_][A-Za-z0-9_]*\b)");
+        var regex = new Regex("""(?<comment>//[^\r\n]*|#[^\r\n]*|/\*[\s\S]*?\*/)|(?<string>@?"(?:""|\\.|[^"])*"|'(?:\\.|[^'])*')|(?<number>\b\d+(?:\.\d+)?\b)|(?<word>\b[A-Za-z_][A-Za-z0-9_]*\b)""");
         var index = 0;
         foreach (Match match in regex.Matches(code))
         {
