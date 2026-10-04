@@ -54,12 +54,23 @@ public sealed class LlamaServerManager : IAsyncDisposable
         Add(psi, "--cache-prompt");
 
         if (backend.UsesCuda)
-            Add(psi, "-ngl", string.IsNullOrWhiteSpace(config.Runtime.GpuLayers) ? "auto" : config.Runtime.GpuLayers);
+        {
+            var gpuLayers = config.Runtime.GpuLayers?.Trim();
+            // llama.cpp b11060 уже использует GPU layers=auto и --fit=on по умолчанию.
+            // Не передаём -ngl auto явно: так auto-fit может свободно подобрать VRAM-параметры.
+            if (!string.IsNullOrWhiteSpace(gpuLayers) &&
+                !gpuLayers.Equals("auto", StringComparison.OrdinalIgnoreCase))
+                Add(psi, "-ngl", gpuLayers);
+        }
         else
         {
             Add(psi, "-ngl", "0");
             Add(psi, "--device", "none");
         }
+
+        LogService.Info(
+            $"LLAMA-START exe=\"{backend.ExecutablePath}\" backend=\"{backend.Name}\" " +
+            $"args={string.Join(" ", psi.ArgumentList.Select(QuoteForLog))}");
 
         _process = new Process { StartInfo = psi, EnableRaisingEvents = true };
         _process.OutputDataReceived += (_, e) => { if (!string.IsNullOrWhiteSpace(e.Data)) LogService.Info("llama: " + e.Data); };
@@ -127,6 +138,14 @@ public sealed class LlamaServerManager : IAsyncDisposable
         "off" or "выкл" or "выключено" => "off",
         _ => "auto"
     };
+
+    private static string QuoteForLog(string value)
+    {
+        if (string.IsNullOrEmpty(value)) return "\"\"";
+        return value.Any(char.IsWhiteSpace) || value.Contains('\"')
+            ? "\"" + value.Replace("\"", "\\\"") + "\""
+            : value;
+    }
 
     public async ValueTask DisposeAsync()
     {
