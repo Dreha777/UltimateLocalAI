@@ -19,16 +19,16 @@ public sealed class BackendSelector
 
         if (hw.NvidiaDetected && IsBlackwell(hw.ComputeCapability, hw.GpuName) && hw.Avx2)
         {
-            var blackwell = Candidate(config, "cuda-blackwell-avx2", "CUDA Blackwell + CPU AVX2", true,
+            var blackwell = CandidateWithLatestFallback(config, "cuda-blackwell-avx2", "CUDA Blackwell + CPU AVX2", true,
                 "Обнаружена NVIDIA Blackwell. Используется отдельный sm_120 backend.");
-            if (File.Exists(blackwell.ExecutablePath)) return blackwell;
-            // Не пытаемся запускать backend 75/86/89 на Blackwell, если отдельный backend не собран.
+            if (blackwell is not null) return blackwell;
+            // Не пытаемся запускать backend 75/86/89 на Blackwell.
         }
         else if (hw.NvidiaDetected && hw.Avx2)
         {
-            var cuda = Candidate(config, "cuda-modern-avx2", "CUDA RTX 20/30/40 + CPU AVX2", true,
+            var cuda = CandidateWithLatestFallback(config, "cuda-modern-avx2", "CUDA RTX 20/30/40 + CPU AVX2", true,
                 "Обнаружена NVIDIA и AVX2. Выбран CUDA backend для Turing/Ampere/Ada/Hopper.");
-            if (File.Exists(cuda.ExecutablePath)) return cuda;
+            if (cuda is not null) return cuda;
         }
 
         if (hw.Avx2)
@@ -48,15 +48,32 @@ public sealed class BackendSelector
         "CPU AVX" => Candidate(config, "cpu-avx", "CPU AVX", false, "Режим выбран вручную."),
         "CPU AVX2" => Candidate(config, "cpu-avx2", "CPU AVX2", false, "Режим выбран вручную."),
         "CUDA Pascal" => Candidate(config, "cuda-pascal-avx", "CUDA Pascal + CPU AVX", true, "Режим выбран вручную."),
-        "CUDA Modern" => Candidate(config, "cuda-modern-avx2", "CUDA RTX 20/30/40 + CPU AVX2", true, "Режим выбран вручную."),
-        "CUDA Blackwell" => Candidate(config, "cuda-blackwell-avx2", "CUDA Blackwell + CPU AVX2", true, "Режим выбран вручную."),
+        "CUDA Modern" => CandidateWithLatestFallback(config, "cuda-modern-avx2", "CUDA RTX 20/30/40 + CPU AVX2", true, "Режим выбран вручную.")
+                         ?? Candidate(config, "cuda-modern-avx2", "CUDA RTX 20/30/40 + CPU AVX2", true, "Режим выбран вручную, но backend не найден."),
+        "CUDA Blackwell" => CandidateWithLatestFallback(config, "cuda-blackwell-avx2", "CUDA Blackwell + CPU AVX2", true, "Режим выбран вручную.")
+                            ?? Candidate(config, "cuda-blackwell-avx2", "CUDA Blackwell + CPU AVX2", true, "Режим выбран вручную, но backend не найден."),
         _ => hw.Avx2 ? Candidate(config, "cpu-avx2", "CPU AVX2", false, "Неизвестный режим; fallback AVX2.") : Candidate(config, "cpu-avx", "CPU AVX", false, "Неизвестный режим; fallback AVX.")
     };
 
-    private static BackendChoice Candidate(AppConfig config, string folder, string name, bool cuda, string reason) => new()
+    private static BackendChoice? CandidateWithLatestFallback(AppConfig config, string folder, string name, bool cuda, string reason)
+    {
+        var primary = Candidate(config, folder, name, cuda, reason);
+        if (File.Exists(primary.ExecutablePath)) return primary;
+
+        if (string.Equals(config.RuntimeChannel, "Stable", StringComparison.OrdinalIgnoreCase))
+        {
+            var latest = Candidate(config, folder, name + " [Latest]", cuda,
+                reason + " В Stable backend отсутствует, автоматически использован упакованный Latest runtime.", "Latest");
+            if (File.Exists(latest.ExecutablePath)) return latest;
+        }
+
+        return null;
+    }
+
+    private static BackendChoice Candidate(AppConfig config, string folder, string name, bool cuda, string reason, string? runtimeChannel = null) => new()
     {
         Name = name,
-        ExecutablePath = Path.Combine(AppPaths.ResolveBackendsDir(config.RuntimeChannel, config.CustomRuntimePath), folder, "llama-server.exe"),
+        ExecutablePath = Path.Combine(AppPaths.ResolveBackendsDir(runtimeChannel ?? config.RuntimeChannel, config.CustomRuntimePath), folder, "llama-server.exe"),
         UsesCuda = cuda,
         Reason = reason
     };

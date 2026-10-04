@@ -14,6 +14,7 @@ public sealed class AppConfig
     public bool AutoStartLastModel { get; set; } = false;
     public bool AutoFallbackToCpu { get; set; } = true;
     public bool UseKnowledgeBase { get; set; } = false;
+    public string WorkspaceBackground { get; set; } = "Светло-серый";
     public RuntimeSettings Runtime { get; set; } = new();
     public GenerationSettings Generation { get; set; } = new();
 }

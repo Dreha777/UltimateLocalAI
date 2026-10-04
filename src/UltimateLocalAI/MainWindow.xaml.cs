@@ -28,6 +28,8 @@ public partial class MainWindow : Window
     private ChatSession? _currentChat;
     private CancellationTokenSource? _generationCts;
     private bool _loadingChat;
+    private bool _modelStarting;
+    private bool _modelReady;
     private int _activeContextSize = 4096;
 
     public ObservableCollection<ChatSession> Chats { get; } = [];
@@ -47,6 +49,12 @@ public partial class MainWindow : Window
         _server.StatusChanged += s => Dispatcher.Invoke(() =>
         {
             RuntimeStatusText.Text = s;
+            if (s.StartsWith("Backend остановлен", StringComparison.OrdinalIgnoreCase))
+            {
+                _modelReady = false;
+                SendButton.IsEnabled = false;
+                UnloadButton.IsEnabled = false;
+            }
             if (ModelLoadProgress.Visibility == Visibility.Visible)
                 TitleStatusText.Text = s;
         });
@@ -63,6 +71,7 @@ public partial class MainWindow : Window
             HardwareText.Text = _hardware.ShortSummary;
             TitleStatusText.Text = "Готов";
             LoadSettingsToUi();
+            ApplyWorkspaceBackground(_config.WorkspaceBackground);
             RefreshModelHeader();
             ReloadChats();
             if (Chats.Count > 0) ChatsList.SelectedItem = Chats[0];
@@ -237,6 +246,7 @@ public partial class MainWindow : Window
     private async void UnloadModel_Click(object sender, RoutedEventArgs e)
     {
         _generationCts?.Cancel();
+        _modelReady = false;
         StartButton.IsEnabled = false;
         UnloadButton.IsEnabled = false;
         SendButton.IsEnabled = false;
@@ -284,6 +294,12 @@ public partial class MainWindow : Window
 
     private async Task<bool> StartModelInternalAsync(bool showErrors)
     {
+        if (_modelStarting)
+        {
+            RuntimeStatusText.Text = "Модель уже загружается…";
+            return false;
+        }
+
         if (!File.Exists(_config.ModelPath))
         {
             if (showErrors) MessageBox.Show("Сначала выберите GGUF-модель.", "Модель", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -291,6 +307,8 @@ public partial class MainWindow : Window
         }
 
         ApplySettingsFromUi(save: true);
+        _modelStarting = true;
+        _modelReady = false;
         StartButton.IsEnabled = false;
         SendButton.IsEnabled = false;
         UnloadButton.IsEnabled = false;
@@ -317,6 +335,7 @@ public partial class MainWindow : Window
                 BackendText.Text = $"{cpu.Name} · CUDA не запустилась, применён безопасный CPU fallback";
                 await _server.StartAsync(cpu, launchConfig);
             }
+            _modelReady = true;
             TitleStatusText.Text = "Модель готова";
             ModelLoadProgress.Visibility = Visibility.Collapsed;
             StartButton.Content = "Перезапустить";
@@ -329,6 +348,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            _modelReady = false;
             LogService.Error("Model start failed", ex);
             await _server.StopAsync();
             TitleStatusText.Text = "Ошибка загрузки";
@@ -346,7 +366,11 @@ public partial class MainWindow : Window
             }
             return false;
         }
-        finally { StartButton.IsEnabled = true; }
+        finally
+        {
+            _modelStarting = false;
+            StartButton.IsEnabled = true;
+        }
     }
 
     private AppConfig CreateLaunchConfig(BackendChoice backend)
@@ -376,6 +400,7 @@ public partial class MainWindow : Window
             AutoStartLastModel = _config.AutoStartLastModel,
             AutoFallbackToCpu = _config.AutoFallbackToCpu,
             UseKnowledgeBase = _config.UseKnowledgeBase,
+            WorkspaceBackground = _config.WorkspaceBackground,
             Runtime = profile.Runtime,
             Generation = _config.Generation
         };
@@ -421,7 +446,12 @@ public partial class MainWindow : Window
     {
         var prompt = PromptBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(prompt) && PendingAttachments.Count == 0) return;
-        if (!_server.IsRunning && !await StartModelInternalAsync(showErrors: true)) return;
+        if (_modelStarting)
+        {
+            RuntimeStatusText.Text = "Дождитесь завершения загрузки модели…";
+            return;
+        }
+        if ((!_server.IsRunning || !_modelReady) && !await StartModelInternalAsync(showErrors: true)) return;
         if (_currentChat is null) CreateAndSelectChat();
         if (_currentChat is null) return;
 
@@ -553,9 +583,9 @@ public partial class MainWindow : Window
             }
             _generationCts.Dispose(); _generationCts = null;
             SendButton.Content = "➤";
-            SendButton.IsEnabled = _server.IsRunning;
+            SendButton.IsEnabled = _server.IsRunning && _modelReady;
             StartButton.IsEnabled = true;
-            RuntimeStatusText.Text = _server.IsRunning ? "Модель готова" : "Backend остановлен";
+            RuntimeStatusText.Text = _server.IsRunning && _modelReady ? "Модель готова" : "Backend остановлен";
             ScrollToBottom();
         }
     }
@@ -574,6 +604,24 @@ public partial class MainWindow : Window
     {
         var s = text.Replace("\r", " ").Replace("\n", " ").Trim();
         return s.Length > 42 ? s[..42] + "…" : s;
+    }
+
+    private void WorkspaceBackgroundBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (WorkspaceBackgroundBox.SelectedItem is ComboBoxItem item)
+            ApplyWorkspaceBackground(item.Content?.ToString());
+    }
+
+    private void ApplyWorkspaceBackground(string? mode)
+    {
+        var hex = mode switch
+        {
+            "Белый" => "#FFFFFF",
+            "Тёплый" => "#F4F1EA",
+            "Холодный" => "#EEF3F8",
+            _ => "#ECECF1"
+        };
+        ChatSurface.Background = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString(hex)!;
     }
 
     private void Settings_Click(object sender, RoutedEventArgs e) { LoadSettingsToUi(); SettingsPanel.Visibility = Visibility.Visible; }
@@ -603,6 +651,7 @@ public partial class MainWindow : Window
         MaxTokensBox.Text = _config.Generation.MaxTokens.ToString();
         SeedBox.Text = _config.Generation.Seed.ToString();
         SystemPromptBox.Text = _config.Generation.SystemPrompt;
+        SelectComboByText(WorkspaceBackgroundBox, _config.WorkspaceBackground);
         KnowledgeCheck.IsChecked = _config.UseKnowledgeBase;
     }
 
@@ -630,7 +679,9 @@ public partial class MainWindow : Window
         _config.Generation.MaxTokens = ParseInt(MaxTokensBox.Text, _config.Generation.MaxTokens, 16, 131072);
         _config.Generation.Seed = ParseInt(SeedBox.Text, _config.Generation.Seed, -1, int.MaxValue);
         _config.Generation.SystemPrompt = SystemPromptBox.Text.Trim();
+        _config.WorkspaceBackground = (WorkspaceBackgroundBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Светло-серый";
         _config.UseKnowledgeBase = KnowledgeCheck.IsChecked == true;
+        ApplyWorkspaceBackground(_config.WorkspaceBackground);
         if (save) _configService.Save(_config);
     }
 
@@ -654,14 +705,17 @@ public partial class MainWindow : Window
         _config.BackendMode = "Auto";
         _config.RuntimeChannel = "Stable";
         _config.CustomRuntimePath = "";
+        _config.WorkspaceBackground = "Светло-серый";
         LoadSettingsToUi();
+        ApplyWorkspaceBackground(_config.WorkspaceBackground);
     }
 
 
     private async void Benchmark_Click(object sender, RoutedEventArgs e)
     {
         ApplySettingsFromUi(save: true);
-        if (!_server.IsRunning && !await StartModelInternalAsync(showErrors: true)) return;
+        if (_modelStarting) return;
+        if ((!_server.IsRunning || !_modelReady) && !await StartModelInternalAsync(showErrors: true)) return;
         RuntimeStatusText.Text = "Тест скорости…";
         var test = new ChatMessage { Role = "user", Content = "Кратко перечисли числа от 1 до 100 словами через запятую. Не добавляй пояснений." };
         var settings = new GenerationSettings
@@ -712,8 +766,12 @@ public partial class MainWindow : Window
     {
         if (e.ClickCount == 2) ToggleMaximize(); else if (e.LeftButton == MouseButtonState.Pressed) DragMove();
     }
-    private void Minimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+    private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
     private void Maximize_Click(object sender, RoutedEventArgs e) => ToggleMaximize();
-    private void ToggleMaximize() => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
-    private void Close_Click(object sender, RoutedEventArgs e) => Close();
+    private void ToggleMaximize()
+    {
+        if (WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
+        else SystemCommands.MaximizeWindow(this);
+    }
+    private void Close_Click(object sender, RoutedEventArgs e) => SystemCommands.CloseWindow(this);
 }
