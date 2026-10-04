@@ -50,13 +50,19 @@ jobs:
           $patchDir = "dist/UltimateLocalAI-GUI-Patch"
           $zip = "dist/UltimateLocalAI-GUI-Patch.zip"
           New-Item -ItemType Directory -Force $patchDir | Out-Null
-          Copy-Item $dll.FullName (Join-Path $patchDir "UltimateLocalAI.dll") -Force
-          Copy-Item "FIRST_START_RU.txt" (Join-Path $patchDir "FIRST_START_RU.txt") -Force
-          Copy-Item "USER_GUIDE_RU.txt" (Join-Path $patchDir "USER_GUIDE_RU.txt") -Force
 
-          $pdb = [System.IO.Path]::ChangeExtension($dll.FullName, ".pdb")
-          if (Test-Path $pdb) {
-            Copy-Item $pdb (Join-Path $patchDir "UltimateLocalAI.pdb") -Force
+          # Copy the complete managed GUI output, not only UltimateLocalAI.dll.
+          # Stage 7D introduced managed NuGet dependencies (WpfMath / MigraDoc / PDFsharp),
+          # so a DLL-only patch would be incomplete on an older Portable build.
+          $guiDir = Split-Path $dll.FullName -Parent
+          Get-ChildItem $guiDir -File | Where-Object {
+            $_.Extension -in @(".dll", ".json", ".pdb")
+          } | ForEach-Object {
+            Copy-Item $_.FullName (Join-Path $patchDir $_.Name) -Force
+          }
+
+          if (Test-Path (Join-Path $guiDir "runtimes")) {
+            Copy-Item (Join-Path $guiDir "runtimes") (Join-Path $patchDir "runtimes") -Recurse -Force
           }
 
           foreach ($doc in @("FIRST_START_RU.txt", "USER_GUIDE_RU.txt", "THIRD_PARTY_NOTICES.md")) {
@@ -73,12 +79,13 @@ jobs:
           Installation:
           1. Close UltimateLocalAI.exe completely.
           2. Open a previously downloaded FULL Portable build.
-          3. Make a backup copy of its UltimateLocalAI.dll.
-          4. Replace UltimateLocalAI.dll in the Portable root with the file from this patch.
-          5. Do not replace the backends folder or the .NET runtime files.
+          3. Make a backup copy of the Portable folder.
+          4. Copy all files and folders from this patch into the Portable root and allow replacement.
+          5. Do not delete or replace the backends folder.
 
-          This patch is intended for C#/XAML-only changes.
-          If project dependencies or native llama.cpp runtimes change, use a new FULL Portable build instead.
+          This patch is intended for GUI/C# changes and includes the managed GUI dependencies
+          required by the current build. If native llama.cpp runtimes change, use a new FULL
+          Portable build instead.
           "@ | Set-Content (Join-Path $patchDir "PATCH_README.txt") -Encoding UTF8
 
           if (Test-Path $zip) {
