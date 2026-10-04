@@ -38,7 +38,7 @@ public partial class MainWindow : Window
     public ObservableCollection<ChatSession> Chats { get; } = [];
     public ObservableCollection<UiMessage> Messages { get; } = [];
     public ObservableCollection<AttachmentInfo> PendingAttachments { get; } = [];
-    public ObservableCollection<string> BackendModes { get; } = ["Auto", "CPU AVX", "CPU AVX2", "CUDA Pascal", "CUDA Modern", "CUDA Blackwell"];
+    public ObservableCollection<string> BackendModes { get; } = ["Auto", "CPU AVX", "CPU AVX2", "CUDA Pascal", "CUDA Modern", "CUDA Blackwell", "Vulkan"];
     public ObservableCollection<string> RuntimeChannels { get; } = ["Stable", "Latest", "Custom"];
     public ObservableCollection<string> CacheTypes { get; } = ["f16", "q8_0", "q5_1", "q5_0", "q4_1", "q4_0"];
 

@@ -83,6 +83,8 @@ $cpuAvx2 = @('-DGGML_CUDA=OFF','-DGGML_AVX=ON','-DGGML_AVX2=ON','-DGGML_FMA=ON',
 $cudaPascal = @('-DGGML_CUDA=ON','-DCMAKE_CUDA_ARCHITECTURES=61','-DGGML_AVX=ON','-DGGML_AVX2=OFF','-DGGML_FMA=OFF','-DGGML_F16C=OFF','-DGGML_BMI2=OFF')
 $cudaModern = @('-DGGML_CUDA=ON','-DCMAKE_CUDA_ARCHITECTURES=75;86;89','-DGGML_AVX=ON','-DGGML_AVX2=ON','-DGGML_FMA=ON','-DGGML_F16C=ON','-DGGML_BMI2=ON')
 $cudaBlackwell = @('-DGGML_CUDA=ON','-DCMAKE_CUDA_ARCHITECTURES=120','-DGGML_AVX=ON','-DGGML_AVX2=ON','-DGGML_FMA=ON','-DGGML_F16C=ON','-DGGML_BMI2=ON')
+$vulkanAvx = @('-DGGML_CUDA=OFF','-DGGML_VULKAN=ON','-DGGML_AVX=ON','-DGGML_AVX2=OFF','-DGGML_FMA=OFF','-DGGML_F16C=OFF','-DGGML_BMI2=OFF')
+$vulkanAvx2 = @('-DGGML_CUDA=OFF','-DGGML_VULKAN=ON','-DGGML_AVX=ON','-DGGML_AVX2=ON','-DGGML_FMA=ON','-DGGML_F16C=ON','-DGGML_BMI2=ON')
 
 # Stable b11060: target user's Xeon / i7 plus Pascal GPU.
 Build-Backend $StableSource 'stable' 'cpu-avx' $cpuAvx $false $true
@@ -92,6 +94,9 @@ Build-Backend $StableSource 'stable' 'cuda-pascal-avx' $cudaPascal $true $true
 # Latest runtime: maximizes compatibility with newly released GGUF architectures.
 Build-Backend $LatestSource 'latest' 'cpu-avx' $cpuAvx $false $true
 Build-Backend $LatestSource 'latest' 'cpu-avx2' $cpuAvx2 $false $true
+# Universal GPU fallback for AMD, Intel and NVIDIA architectures not covered by packaged CUDA targets.
+Build-Backend $LatestSource 'latest' 'vulkan-avx' $vulkanAvx $false $true
+Build-Backend $LatestSource 'latest' 'vulkan-avx2' $vulkanAvx2 $false $true
 Build-Backend $LatestSource 'latest' 'cuda-pascal-avx' $cudaPascal $true $true
 Build-Backend $LatestSource 'latest' 'cuda-modern-avx2' $cudaModern $true $false
 Build-Backend $LatestSource 'latest' 'cuda-blackwell-avx2' $cudaBlackwell $true $false
@@ -105,6 +110,7 @@ Ultimate Local AI GitHub Build
 Stable runtime: llama.cpp b11060
 Latest runtime: llama.cpp master at workflow build time
 CUDA Toolkit: $env:CUDA_PATH
+Vulkan SDK: $env:VULKAN_SDK
 Build UTC: $([DateTime]::UtcNow.ToString('O'))
 "@ | Set-Content -Encoding UTF8 (Join-Path $Out 'BUILD_INFO.txt')
 

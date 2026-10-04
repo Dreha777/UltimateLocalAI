@@ -34,7 +34,13 @@ public sealed class BackendSelector
         if (hw.GpuDetected && hw.Avx2)
         {
             var vulkan = CandidateWithLatestFallback(config, "vulkan-avx2", "Vulkan GPU + CPU AVX2", false,
-                $"GPU {hw.GpuVendor} обнаружена. CUDA-профиль не подходит; пробуем универсальный Vulkan backend.", usesGpu: true);
+                $"GPU {hw.GpuVendor} обнаружена. CUDA-профиль не подходит; пробуем универсальный Vulkan AVX2 backend.", usesGpu: true);
+            if (vulkan is not null) return vulkan;
+        }
+        else if (hw.GpuDetected && hw.Avx)
+        {
+            var vulkan = CandidateWithLatestFallback(config, "vulkan-avx", "Vulkan GPU + CPU AVX", false,
+                $"GPU {hw.GpuVendor} обнаружена на AVX-only CPU; пробуем совместимый Vulkan AVX backend.", usesGpu: true);
             if (vulkan is not null) return vulkan;
         }
 
@@ -59,8 +65,17 @@ public sealed class BackendSelector
                          ?? Candidate(config, "cuda-modern-avx2", "CUDA RTX 20/30/40 + CPU AVX2", true, "Режим выбран вручную, но backend не найден."),
         "CUDA Blackwell" => CandidateWithLatestFallback(config, "cuda-blackwell-avx2", "CUDA Blackwell + CPU AVX2", true, "Режим выбран вручную.")
                             ?? Candidate(config, "cuda-blackwell-avx2", "CUDA Blackwell + CPU AVX2", true, "Режим выбран вручную, но backend не найден."),
+        "Vulkan" => ForcedVulkan(hw, config),
         _ => hw.Avx2 ? Candidate(config, "cpu-avx2", "CPU AVX2", false, "Неизвестный режим; fallback AVX2.") : Candidate(config, "cpu-avx", "CPU AVX", false, "Неизвестный режим; fallback AVX.")
     };
+
+    private static BackendChoice ForcedVulkan(HardwareInfo hw, AppConfig config)
+    {
+        var folder = hw.Avx2 ? "vulkan-avx2" : "vulkan-avx";
+        var name = hw.Avx2 ? "Vulkan GPU + CPU AVX2" : "Vulkan GPU + CPU AVX";
+        return CandidateWithLatestFallback(config, folder, name, false, "Vulkan выбран вручную.", usesGpu: true)
+               ?? Candidate(config, folder, name, false, "Vulkan выбран вручную, но backend не найден.", usesGpu: true);
+    }
 
     private static BackendChoice? CandidateWithLatestFallback(AppConfig config, string folder, string name, bool cuda, string reason, bool? usesGpu = null)
     {
