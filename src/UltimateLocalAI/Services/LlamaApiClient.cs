@@ -18,6 +18,14 @@ public sealed class LlamaApiClient
         if (!string.IsNullOrWhiteSpace(settings.SystemPrompt))
             messages.Add(new { role = "system", content = settings.SystemPrompt });
 
+        messages.Add(new
+        {
+            role = "system",
+            content = "Форматируй ответ читаемо в Markdown. Код помещай в fenced-блоки с языком: ```csharp, ```python и т.п. " +
+                      "Математические формулы записывай в LaTeX: отдельные формулы между $ ... $ или \\[ ... \\], " +
+                      "короткие формулы в тексте между \\( ... \\). Не используй HTML для оформления."
+        });
+
         foreach (var m in history)
         {
             var content = m.Content;

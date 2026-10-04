@@ -14,4 +14,8 @@
     <Description>Портативный офлайн Windows-клиент для локального запуска GGUF-моделей через llama.cpp с автоматическим подбором CPU/GPU backend и параметров для разнородных и маломощных ПК.</Description>
     <Copyright>Copyright © Яхлов Андрей Васильевич</Copyright>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="WpfMath" Version="2.1.0" />
+    <PackageReference Include="PDFsharp-MigraDoc-WPF" Version="6.2.4" />
+  </ItemGroup>
 </Project>

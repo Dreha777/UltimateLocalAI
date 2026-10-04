@@ -20,6 +20,20 @@ When redistributing llama.cpp-derived binaries or source, retain the applicable 
 
 Ultimate Local AI uses .NET 8 / WPF for the Windows graphical application and self-contained runtime packaging. These components are governed by their respective Microsoft/open-source license terms.
 
+## WpfMath / XAML-Math
+
+- Package: WpfMath 2.1.0
+- Project: XAML-Math / WPF-Math
+- License: MIT and OFL-1.1 for applicable bundled font assets
+- Purpose: local rendering of LaTeX mathematical formulae in chat.
+
+## PDFsharp / MigraDoc
+
+- Package: PDFsharp-MigraDoc-WPF 6.2.4
+- Project: PDFsharp / MigraDoc
+- License: MIT
+- Purpose: local export of chat history to PDF and Word-compatible RTF.
+
 ## CUDA / Vulkan
 
 The build system can use NVIDIA CUDA Toolkit and LunarG Vulkan SDK to compile GPU-enabled llama.cpp backends. These SDKs are governed by their own vendor license terms.

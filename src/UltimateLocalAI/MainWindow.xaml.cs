@@ -616,6 +616,68 @@ public partial class MainWindow : Window
         return s.Length > 42 ? s[..42] + "…" : s;
     }
 
+    private void CopyMessage_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not UiMessage message || string.IsNullOrEmpty(message.Content))
+            return;
+
+        try
+        {
+            Clipboard.SetText(message.Content);
+            RuntimeStatusText.Text = "Сообщение скопировано";
+        }
+        catch (Exception ex)
+        {
+            LogService.Warn("Clipboard copy failed: " + ex.Message);
+            MessageBox.Show("Не удалось скопировать сообщение в буфер обмена.", "Копирование",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void ExportChat_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentChat is null || Messages.Count == 0)
+        {
+            MessageBox.Show("В текущем чате пока нет сообщений для экспорта.", "Экспорт чата",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var invalid = Path.GetInvalidFileNameChars();
+        var safeTitle = new string((_currentChat.Title ?? "Чат")
+            .Select(ch => invalid.Contains(ch) ? '_' : ch).ToArray()).Trim();
+        if (string.IsNullOrWhiteSpace(safeTitle)) safeTitle = "Чат";
+
+        var dlg = new SaveFileDialog
+        {
+            Title = "Экспорт текущего чата",
+            FileName = safeTitle,
+            Filter = "Документ Word / RTF (*.rtf)|*.rtf|PDF (*.pdf)|*.pdf",
+            FilterIndex = 1,
+            AddExtension = true,
+            OverwritePrompt = true
+        };
+        if (dlg.ShowDialog(this) != true) return;
+
+        try
+        {
+            if (dlg.FilterIndex == 2 || string.Equals(Path.GetExtension(dlg.FileName), ".pdf", StringComparison.OrdinalIgnoreCase))
+                ChatExportService.ExportPdf(dlg.FileName, _currentChat.Title, Messages);
+            else
+                ChatExportService.ExportWordRtf(dlg.FileName, _currentChat.Title, Messages);
+
+            RuntimeStatusText.Text = "Чат экспортирован";
+            MessageBox.Show($"Чат сохранён:\n{dlg.FileName}", "Экспорт завершён",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            LogService.Error("Chat export failed", ex);
+            MessageBox.Show("Не удалось экспортировать чат:\n" + ex.Message, "Ошибка экспорта",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     private void WorkspaceBackgroundBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (WorkspaceBackgroundBox.SelectedItem is ComboBoxItem item)
@@ -642,6 +704,13 @@ public partial class MainWindow : Window
         SetBrushColor("ControlBrush", palette.Item8);
         SetBrushColor("AssistantBubbleBrush", palette.Item9);
         SetBrushColor("AttachmentBrush", palette.Item10);
+        SetBrushColor("FormulaBackgroundBrush", string.Equals(mode, "Очень тёмный", StringComparison.OrdinalIgnoreCase) ? "#20242B" : "#F2F3F5");
+
+        Application.Current.Resources[SystemColors.WindowBrushKey] = BrushFromHex(palette.Item4);
+        Application.Current.Resources[SystemColors.WindowTextBrushKey] = BrushFromHex(palette.Item5);
+        Application.Current.Resources[SystemColors.HighlightBrushKey] = BrushFromHex("#007AFF");
+        Application.Current.Resources[SystemColors.HighlightTextBrushKey] = System.Windows.Media.Brushes.White;
+
         Background = BrushFromHex(palette.Item1);
         ChatSurface.Background = BrushFromHex(palette.Item3);
     }
