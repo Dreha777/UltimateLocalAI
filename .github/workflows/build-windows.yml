@@ -35,6 +35,59 @@ jobs:
         shell: pwsh
         run: dotnet build src/UltimateLocalAI/UltimateLocalAI.csproj -c Release --no-restore -p:ContinuousIntegrationBuild=true
 
+      - name: Prepare GUI patch
+        shell: pwsh
+        run: |
+          $releaseRoot = "src/UltimateLocalAI/bin/Release"
+          $dll = Get-ChildItem $releaseRoot -Recurse -Filter "UltimateLocalAI.dll" |
+            Where-Object { $_.FullName -notmatch "\\ref\\" } |
+            Select-Object -First 1
+
+          if (-not $dll) {
+            throw "UltimateLocalAI.dll not found after GUI build."
+          }
+
+          $patchDir = "dist/UltimateLocalAI-GUI-Patch"
+          $zip = "dist/UltimateLocalAI-GUI-Patch.zip"
+          New-Item -ItemType Directory -Force $patchDir | Out-Null
+          Copy-Item $dll.FullName (Join-Path $patchDir "UltimateLocalAI.dll") -Force
+
+          $pdb = [System.IO.Path]::ChangeExtension($dll.FullName, ".pdb")
+          if (Test-Path $pdb) {
+            Copy-Item $pdb (Join-Path $patchDir "UltimateLocalAI.pdb") -Force
+          }
+
+          @"
+          ULTIMATE LOCAL AI - FAST GUI PATCH
+          Commit: $env:GITHUB_SHA
+          Run: $env:GITHUB_RUN_NUMBER
+
+          Installation:
+          1. Close UltimateLocalAI.exe completely.
+          2. Open a previously downloaded FULL Portable build.
+          3. Make a backup copy of its UltimateLocalAI.dll.
+          4. Replace UltimateLocalAI.dll in the Portable root with the file from this patch.
+          5. Do not replace the backends folder or the .NET runtime files.
+
+          This patch is intended for C#/XAML-only changes.
+          If project dependencies or native llama.cpp runtimes change, use a new FULL Portable build instead.
+          "@ | Set-Content (Join-Path $patchDir "PATCH_README.txt") -Encoding UTF8
+
+          if (Test-Path $zip) {
+            Remove-Item $zip -Force
+          }
+          Compress-Archive -Path "$patchDir/*" -DestinationPath $zip -CompressionLevel Optimal
+          Get-Item $zip | Select-Object Name, Length
+
+      - name: Upload GUI patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: UltimateLocalAI-GUI-Patch
+          path: dist/UltimateLocalAI-GUI-Patch.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
   full-build:
     name: Full Windows x64 portable
     if: github.event_name == 'workflow_dispatch'
