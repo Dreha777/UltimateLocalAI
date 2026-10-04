@@ -640,8 +640,8 @@ public partial class MainWindow : Window
 
     private static void SetBrushColor(string key, string hex)
     {
-        if (Application.Current.Resources[key] is System.Windows.Media.SolidColorBrush brush)
-            brush.Color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hex);
+        var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hex);
+        Application.Current.Resources[key] = new System.Windows.Media.SolidColorBrush(color);
     }
 
     private static System.Windows.Media.Brush BrushFromHex(string hex) =>
