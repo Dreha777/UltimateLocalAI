@@ -323,6 +323,8 @@ Copy-Item (Join-Path $Root 'backends') (Join-Path $dist 'backends') -Recurse -Fo
 New-Item -ItemType Directory -Force (Join-Path $dist 'Data') | Out-Null
 New-Item -ItemType Directory -Force (Join-Path $dist 'Logs') | Out-Null
 Copy-Item (Join-Path $Root 'FIRST_START_RU.txt') $dist -Force
+Copy-Item (Join-Path $Root 'USER_GUIDE_RU.txt') $dist -Force
+Copy-Item (Join-Path $Root 'THIRD_PARTY_NOTICES.md') $dist -Force
 Copy-Item (Join-Path $Root 'VERSION.txt') $dist -Force
 
 $exe = Join-Path $dist 'UltimateLocalAI.exe'
