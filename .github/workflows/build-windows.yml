@@ -59,6 +59,12 @@ jobs:
             Copy-Item $pdb (Join-Path $patchDir "UltimateLocalAI.pdb") -Force
           }
 
+          foreach ($doc in @("FIRST_START_RU.txt", "USER_GUIDE_RU.txt", "THIRD_PARTY_NOTICES.md")) {
+            if (Test-Path $doc) {
+              Copy-Item $doc (Join-Path $patchDir $doc) -Force
+            }
+          }
+
           @"
           ULTIMATE LOCAL AI - FAST GUI PATCH
           Commit: $env:GITHUB_SHA
