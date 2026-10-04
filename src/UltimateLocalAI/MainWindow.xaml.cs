@@ -486,33 +486,64 @@ public partial class MainWindow : Window
         SendButton.IsEnabled = true;
         StartButton.IsEnabled = false;
         RuntimeStatusText.Text = "Генерация ответа…";
+
         var sw = Stopwatch.StartNew();
+        var pendingText = new StringBuilder();
+        var pendingLock = new object();
+        var nextScrollAtMs = 0L;
+        var streamTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(50)
+        };
+
+        void FlushPendingText(bool forceScroll = false)
+        {
+            string chunk;
+            lock (pendingLock)
+            {
+                if (pendingText.Length == 0) return;
+                chunk = pendingText.ToString();
+                pendingText.Clear();
+            }
+
+            assistantUi.Content += chunk;
+
+            if (forceScroll || sw.ElapsedMilliseconds >= nextScrollAtMs)
+            {
+                ScrollToBottom();
+                nextScrollAtMs = sw.ElapsedMilliseconds + 250;
+            }
+        }
+
+        streamTimer.Tick += (_, _) => FlushPendingText();
+        streamTimer.Start();
+
         try
         {
             var history = _chatRepo.GetMessages(_currentChat.Id);
             await _api.StreamChatAsync(_config.Port, history, _config.Generation, delta =>
             {
-                Dispatcher.Invoke(() =>
-                {
-                    assistantUi.Content += delta;
-                    // ItemsControl не отслеживает изменение обычного свойства: принудительно обновляем представление.
-                    var index = Messages.IndexOf(assistantUi);
-                    if (index >= 0) { Messages.RemoveAt(index); Messages.Insert(index, assistantUi); }
-                    ScrollToBottom();
-                });
+                lock (pendingLock)
+                    pendingText.Append(delta);
             }, _generationCts.Token);
+
+            FlushPendingText(forceScroll: true);
         }
         catch (OperationCanceledException)
         {
+            FlushPendingText(forceScroll: true);
             if (string.IsNullOrWhiteSpace(assistantUi.Content)) assistantUi.Content = "[Генерация остановлена]";
         }
         catch (Exception ex)
         {
+            FlushPendingText(forceScroll: true);
             LogService.Error("Generation failed", ex);
             assistantUi.Content = string.IsNullOrWhiteSpace(assistantUi.Content) ? "Ошибка генерации: " + ex.Message : assistantUi.Content + "\n\n[Ошибка: " + ex.Message + "]";
         }
         finally
         {
+            streamTimer.Stop();
+            FlushPendingText(forceScroll: true);
             sw.Stop();
             if (!string.IsNullOrWhiteSpace(assistantUi.Content))
             {

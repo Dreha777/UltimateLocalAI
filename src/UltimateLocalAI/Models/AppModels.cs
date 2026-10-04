@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 
 namespace UltimateLocalAI.Models;
 
@@ -66,12 +68,41 @@ public sealed class ChatMessage
     public List<AttachmentInfo> Attachments { get; set; } = [];
 }
 
-public sealed class UiMessage
+public sealed class UiMessage : INotifyPropertyChanged
 {
+    private string _content = "";
+    private string _attachmentSummary = "";
+
     public string Role { get; set; } = "assistant";
-    public string Content { get; set; } = "";
-    public string AttachmentSummary { get; set; } = "";
+
+    public string Content
+    {
+        get => _content;
+        set
+        {
+            if (_content == value) return;
+            _content = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public string AttachmentSummary
+    {
+        get => _attachmentSummary;
+        set
+        {
+            if (_attachmentSummary == value) return;
+            _attachmentSummary = value;
+            OnPropertyChanged();
+        }
+    }
+
     public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }
 
 public sealed class AttachmentInfo
