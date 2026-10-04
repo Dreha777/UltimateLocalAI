@@ -24,7 +24,7 @@ public sealed class BackendSelector
             if (blackwell is not null) return blackwell;
             // Не пытаемся запускать backend 75/86/89 на Blackwell.
         }
-        else if (hw.NvidiaDetected && hw.Avx2)
+        else if (hw.NvidiaDetected && hw.Avx2 && IsModernSupported(hw.ComputeCapability, hw.GpuName))
         {
             var cuda = CandidateWithLatestFallback(config, "cuda-modern-avx2", "CUDA RTX 20/30/40 + CPU AVX2", true,
                 "Обнаружена NVIDIA и AVX2. Выбран CUDA backend для Turing/Ampere/Ada/Hopper.");
@@ -80,12 +80,24 @@ public sealed class BackendSelector
 
     private static bool IsPascal(string cc, string gpuName)
     {
-        if (!string.IsNullOrWhiteSpace(cc) && (cc.StartsWith("6.", StringComparison.OrdinalIgnoreCase) || cc == "61")) return true;
+        if (!string.IsNullOrWhiteSpace(cc) && (cc.Equals("6.1", StringComparison.OrdinalIgnoreCase) || cc == "61")) return true;
         var name = gpuName ?? "";
         return name.Contains("GTX 1050", StringComparison.OrdinalIgnoreCase) ||
                name.Contains("GTX 1060", StringComparison.OrdinalIgnoreCase) ||
                name.Contains("GTX 1070", StringComparison.OrdinalIgnoreCase) ||
                name.Contains("GTX 1080", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsModernSupported(string cc, string gpuName)
+    {
+        var normalized = (cc ?? "").Trim();
+        if (normalized is "7.5" or "75" or "8.6" or "86" or "8.9" or "89")
+            return true;
+
+        var name = gpuName ?? "";
+        return name.Contains("RTX 20", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("RTX 30", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("RTX 40", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsBlackwell(string cc, string gpuName)
