@@ -22,6 +22,9 @@ public partial class MainWindow : Window
     private readonly LlamaApiClient _api = new();
     private readonly FileTextExtractor _extractor = new();
     private readonly KnowledgeBaseService _knowledge;
+    private readonly ResourceMonitorService _resourceMonitor = new();
+    private readonly System.Windows.Threading.DispatcherTimer _resourceTimer = new() { Interval = TimeSpan.FromSeconds(2) };
+    private bool _resourceRefreshBusy;
 
     private AppConfig _config;
     private HardwareInfo _hardware = new();
@@ -58,6 +61,7 @@ public partial class MainWindow : Window
             if (ModelLoadProgress.Visibility == Visibility.Visible)
                 TitleStatusText.Text = s;
         });
+        _resourceTimer.Tick += async (_, _) => await RefreshResourceUsageAsync();
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
     }
@@ -71,11 +75,14 @@ public partial class MainWindow : Window
             HardwareText.Text = _hardware.ShortSummary;
             TitleStatusText.Text = "Готов";
             LoadSettingsToUi();
-            ApplyWorkspaceBackground(_config.WorkspaceBackground);
+            ApplyApplicationTheme(_config.WorkspaceBackground);
             RefreshModelHeader();
             ReloadChats();
             if (Chats.Count > 0) ChatsList.SelectedItem = Chats[0];
             else CreateAndSelectChat();
+
+            _resourceTimer.Start();
+            await RefreshResourceUsageAsync();
 
             if (_config.AutoStartLastModel && File.Exists(_config.ModelPath))
                 await StartModelInternalAsync(showErrors: false);
@@ -89,6 +96,7 @@ public partial class MainWindow : Window
 
     private async void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
+        _resourceTimer.Stop();
         try { _configService.Save(_config); } catch { }
         _generationCts?.Cancel();
         await _server.StopAsync();
@@ -386,6 +394,7 @@ public partial class MainWindow : Window
             return _config;
         }
 
+        HardwareDetector.RefreshMemory(_hardware);
         var profile = _autoRuntimeConfigurator.Create(_hardware, backend, _config.Runtime, _config.ModelPath);
         _activeContextSize = profile.Runtime.ContextSize;
         LogService.Info(AutoRuntimeConfigurator.ToLogLine(_hardware, backend, profile));
@@ -609,19 +618,79 @@ public partial class MainWindow : Window
     private void WorkspaceBackgroundBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (WorkspaceBackgroundBox.SelectedItem is ComboBoxItem item)
-            ApplyWorkspaceBackground(item.Content?.ToString());
+            ApplyApplicationTheme(item.Content?.ToString());
     }
 
-    private void ApplyWorkspaceBackground(string? mode)
+    private void ApplyApplicationTheme(string? mode)
     {
-        var hex = mode switch
+        var palette = mode switch
         {
-            "Белый" => "#FFFFFF",
-            "Тёплый" => "#F4F1EA",
-            "Холодный" => "#EEF3F8",
-            _ => "#ECECF1"
+            "Белый" => ("#FFFFFF", "#F5F5F7", "#FAFAFA", "#FFFFFF"),
+            "Тёплый" => ("#F6F1E7", "#EEE6D8", "#F3EDE3", "#FFFDF8"),
+            "Холодный" => ("#EEF3F8", "#E2EAF2", "#E8EFF6", "#F8FBFE"),
+            _ => ("#F5F5F7", "#ECECF1", "#ECECF1", "#FFFFFF")
         };
-        ChatSurface.Background = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString(hex)!;
+
+        SetBrushColor("BgBrush", palette.Item1);
+        SetBrushColor("SidebarBrush", palette.Item2);
+        SetBrushColor("PanelBrush", palette.Item4);
+        Background = BrushFromHex(palette.Item1);
+        ChatSurface.Background = BrushFromHex(palette.Item3);
+    }
+
+    private static void SetBrushColor(string key, string hex)
+    {
+        if (Application.Current.Resources[key] is System.Windows.Media.SolidColorBrush brush)
+            brush.Color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hex);
+    }
+
+    private static System.Windows.Media.Brush BrushFromHex(string hex) =>
+        (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString(hex)!;
+
+    private async Task RefreshResourceUsageAsync()
+    {
+        if (_resourceRefreshBusy) return;
+        _resourceRefreshBusy = true;
+        try
+        {
+            var snapshot = await _resourceMonitor.ReadAsync(_hardware);
+            if (snapshot.RamTotalMb > 0)
+            {
+                _hardware.TotalRamMb = snapshot.RamTotalMb;
+                _hardware.AvailableRamMb = snapshot.RamAvailableMb;
+                RamUsageBar.Value = Math.Clamp(snapshot.RamPercent, 0, 100);
+                RamUsageText.Text = $"{snapshot.RamUsedMb / 1024.0:0.0}/{snapshot.RamTotalMb / 1024.0:0.0} ГБ";
+            }
+
+            if (snapshot.CpuPercent >= 0)
+            {
+                CpuUsageBar.Value = snapshot.CpuPercent;
+                CpuUsageText.Text = $"{snapshot.CpuPercent:0}%";
+            }
+
+            if (snapshot.GpuPercent >= 0)
+            {
+                GpuUsageBar.Value = snapshot.GpuPercent;
+                var temp = snapshot.GpuTemperatureC >= 0 ? $" · {snapshot.GpuTemperatureC}°C" : "";
+                var vram = snapshot.VramTotalMb > 0
+                    ? $" · {snapshot.VramUsedMb / 1024.0:0.0}/{snapshot.VramTotalMb / 1024.0:0.0} ГБ"
+                    : "";
+                GpuUsageText.Text = $"{snapshot.GpuPercent:0}%{vram}{temp}";
+            }
+            else
+            {
+                GpuUsageBar.Value = 0;
+                GpuUsageText.Text = _hardware.NvidiaDetected ? "нет данных" : "CPU режим";
+            }
+        }
+        catch (Exception ex)
+        {
+            LogService.Warn("Resource monitor: " + ex.Message);
+        }
+        finally
+        {
+            _resourceRefreshBusy = false;
+        }
     }
 
     private void Settings_Click(object sender, RoutedEventArgs e) { LoadSettingsToUi(); SettingsPanel.Visibility = Visibility.Visible; }
@@ -681,7 +750,7 @@ public partial class MainWindow : Window
         _config.Generation.SystemPrompt = SystemPromptBox.Text.Trim();
         _config.WorkspaceBackground = (WorkspaceBackgroundBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Светло-серый";
         _config.UseKnowledgeBase = KnowledgeCheck.IsChecked == true;
-        ApplyWorkspaceBackground(_config.WorkspaceBackground);
+        ApplyApplicationTheme(_config.WorkspaceBackground);
         if (save) _configService.Save(_config);
     }
 

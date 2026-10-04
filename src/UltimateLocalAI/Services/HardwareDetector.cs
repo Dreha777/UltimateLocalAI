@@ -33,10 +33,10 @@ public sealed class HardwareDetector
             LogicalProcessors = Environment.ProcessorCount,
             Sse42 = Sse42.IsSupported,
             Avx = Avx.IsSupported,
-            Avx2 = Avx2.IsSupported,
-            TotalRamMb = GetRamMb()
+            Avx2 = Avx2.IsSupported
         };
 
+        RefreshMemory(info);
         await DetectNvidiaAsync(info);
         return info;
     }
@@ -51,10 +51,12 @@ public sealed class HardwareDetector
         catch { return "Не определён"; }
     }
 
-    private static long GetRamMb()
+    public static void RefreshMemory(HardwareInfo info)
     {
         var stat = new MEMORYSTATUSEX { dwLength = (uint)Marshal.SizeOf<MEMORYSTATUSEX>() };
-        return GlobalMemoryStatusEx(ref stat) ? (long)(stat.ullTotalPhys / 1024 / 1024) : 0;
+        if (!GlobalMemoryStatusEx(ref stat)) return;
+        info.TotalRamMb = (long)(stat.ullTotalPhys / 1024 / 1024);
+        info.AvailableRamMb = (long)(stat.ullAvailPhys / 1024 / 1024);
     }
 
     private static async Task DetectNvidiaAsync(HardwareInfo info)

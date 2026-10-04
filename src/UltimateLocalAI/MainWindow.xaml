@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Ultimate Local AI" Width="1280" Height="820" MinWidth="980" MinHeight="650"
-        WindowStartupLocation="CenterScreen" WindowStyle="None" Background="#F5F5F7">
+        WindowStartupLocation="CenterScreen" WindowStyle="None" Background="{StaticResource BgBrush}">
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="42" ResizeBorderThickness="7" CornerRadius="12" GlassFrameThickness="0" UseAeroCaptionButtons="False" />
     </shell:WindowChrome.WindowChrome>
@@ -12,7 +12,7 @@
         <Grid.RowDefinitions><RowDefinition Height="42"/><RowDefinition Height="*"/></Grid.RowDefinitions>
 
         <!-- Title bar -->
-        <Grid Grid.Row="0" Background="#F5F5F7" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+        <Grid Grid.Row="0" Background="{StaticResource BgBrush}" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
             <Grid.ColumnDefinitions><ColumnDefinition Width="260"/><ColumnDefinition Width="*"/><ColumnDefinition Width="150"/></Grid.ColumnDefinitions>
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
                 <Ellipse Width="11" Height="11" Fill="#FF5F57" Margin="0,0,7,0"/>
@@ -64,7 +64,24 @@
                     </ListBox>
                     <StackPanel Grid.Row="2">
                         <Button Style="{StaticResource SoftButton}" Content="▤  База знаний" HorizontalContentAlignment="Left" Click="Knowledge_Click" Margin="0,6,0,6"/>
-                        <Border Background="#FFFFFF" CornerRadius="12" Padding="10" BorderBrush="#D8D8DE" BorderThickness="1">
+                        <Border Background="{StaticResource PanelBrush}" CornerRadius="12" Padding="10" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Margin="0,0,0,6">
+                            <StackPanel>
+                                <TextBlock Text="РЕСУРСЫ СИСТЕМЫ" FontSize="9" FontWeight="Bold" Foreground="{StaticResource MutedBrush}"/>
+                                <Grid Margin="0,7,0,2"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="CPU" FontSize="10"/><TextBlock x:Name="CpuUsageText" Grid.Column="1" Text="—" FontSize="10" Foreground="{StaticResource MutedBrush}"/>
+                                </Grid>
+                                <ProgressBar x:Name="CpuUsageBar" Height="4" Minimum="0" Maximum="100" Value="0"/>
+                                <Grid Margin="0,7,0,2"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="RAM" FontSize="10"/><TextBlock x:Name="RamUsageText" Grid.Column="1" Text="—" FontSize="10" Foreground="{StaticResource MutedBrush}"/>
+                                </Grid>
+                                <ProgressBar x:Name="RamUsageBar" Height="4" Minimum="0" Maximum="100" Value="0"/>
+                                <Grid Margin="0,7,0,2"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="GPU / VRAM" FontSize="10"/><TextBlock x:Name="GpuUsageText" Grid.Column="1" Text="—" FontSize="10" Foreground="{StaticResource MutedBrush}"/>
+                                </Grid>
+                                <ProgressBar x:Name="GpuUsageBar" Height="4" Minimum="0" Maximum="100" Value="0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Background="{StaticResource PanelBrush}" CornerRadius="12" Padding="10" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
                             <StackPanel>
                                 <TextBlock Text="ЭТОТ КОМПЬЮТЕР" FontSize="9" FontWeight="Bold" Foreground="{StaticResource MutedBrush}"/>
                                 <TextBlock x:Name="HardwareText" Text="Определение…" FontSize="11" Margin="0,6,0,0" TextWrapping="Wrap"/>
@@ -96,7 +113,7 @@
                                  IsIndeterminate="True" Visibility="Collapsed"/>
                 </Grid>
 
-                <Border x:Name="ChatSurface" Grid.Row="1" Background="#ECECF1" CornerRadius="16" Padding="1" BorderBrush="#E2E2E7" BorderThickness="1">
+                <Border x:Name="ChatSurface" Grid.Row="1" Background="{StaticResource SidebarBrush}" CornerRadius="16" Padding="1" BorderBrush="#E2E2E7" BorderThickness="1">
                     <ScrollViewer x:Name="ChatScroll" VerticalScrollBarVisibility="Auto" Padding="18">
                         <ItemsControl ItemsSource="{Binding Messages}">
                             <ItemsControl.ItemTemplate>
@@ -117,7 +134,7 @@
                 </Border>
 
                 <!-- Composer -->
-                <Border Grid.Row="2" Background="White" CornerRadius="16" Margin="0,12,0,8" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="10">
+                <Border Grid.Row="2" Background="{StaticResource PanelBrush}" CornerRadius="16" Margin="0,12,0,8" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="10">
                     <Grid>
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <ItemsControl x:Name="AttachmentList" ItemsSource="{Binding PendingAttachments}" Margin="2,0,2,6">
@@ -141,7 +158,7 @@
             </Grid>
 
             <!-- Settings drawer -->
-            <Border x:Name="SettingsPanel" Grid.Column="1" Width="450" HorizontalAlignment="Right" Background="#FAFAFC" BorderBrush="#D8D8DE" BorderThickness="1,0,0,0" Visibility="Collapsed" Panel.ZIndex="20">
+            <Border x:Name="SettingsPanel" Grid.Column="1" Width="450" HorizontalAlignment="Right" Background="{StaticResource PanelBrush}" BorderBrush="#D8D8DE" BorderThickness="1,0,0,0" Visibility="Collapsed" Panel.ZIndex="20">
                 <Grid>
                     <Grid.RowDefinitions><RowDefinition Height="58"/><RowDefinition Height="*"/><RowDefinition Height="64"/></Grid.RowDefinitions>
                     <Grid Margin="18,0"><TextBlock Text="Настройки модели" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/><Button Content="×" Width="36" Height="36" HorizontalAlignment="Right" Background="Transparent" BorderThickness="0" FontSize="20" Click="CloseSettings_Click"/></Grid>
@@ -154,8 +171,8 @@
                             <TextBlock Text="Backend" FontWeight="SemiBold" Margin="0,13,0,0"/><TextBlock Text="Авто выбирает AVX/AVX2/CUDA по железу. Xeon E3-1270 + GTX 1050 использует отдельный CUDA Pascal sm_61 backend." FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,2,0,5"/>
                             <ComboBox x:Name="BackendModeBox" ItemsSource="{Binding BackendModes}"/>
 
-                            <TextBlock Text="Фон рабочего поля" FontWeight="SemiBold" Margin="0,13,0,0"/>
-                            <TextBlock Text="Меняет фон области переписки. Настройка сохраняется между запусками." FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,2,0,5"/>
+                            <TextBlock Text="Тема интерфейса" FontWeight="SemiBold" Margin="0,13,0,0"/>
+                            <TextBlock Text="Меняет оформление всего окна программы. Настройка сохраняется между запусками." FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,2,0,5"/>
                             <ComboBox x:Name="WorkspaceBackgroundBox" SelectionChanged="WorkspaceBackgroundBox_SelectionChanged">
                                 <ComboBoxItem Content="Светло-серый"/>
                                 <ComboBoxItem Content="Белый"/>

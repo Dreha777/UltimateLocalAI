@@ -119,6 +119,7 @@ public sealed class HardwareInfo
     public string CpuName { get; set; } = "Не определён";
     public int LogicalProcessors { get; set; } = Environment.ProcessorCount;
     public long TotalRamMb { get; set; }
+    public long AvailableRamMb { get; set; }
     public bool Avx { get; set; }
     public bool Avx2 { get; set; }
     public bool Sse42 { get; set; }
