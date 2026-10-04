@@ -58,12 +58,12 @@ public sealed class AutoRuntimeConfigurator
         }
 
         // Для AVX-only CPU и маленькой VRAM используем консервативные batch.
-        if (!hw.Avx2 || (backend.UsesCuda && hw.GpuVramMb > 0 && hw.GpuVramMb < 4096))
+        if (!hw.Avx2 || (backend.UsesGpu && hw.GpuVramMb > 0 && hw.GpuVramMb < 4096))
         {
             batch = Math.Min(batch, 256);
             ubatch = Math.Min(ubatch, 128);
         }
-        if (backend.UsesCuda && hw.GpuVramMb > 0 && hw.GpuVramMb < 2560)
+        if (backend.UsesGpu && hw.GpuVramMb > 0 && hw.GpuVramMb < 2560)
         {
             batch = Math.Min(batch, 128);
             ubatch = Math.Min(ubatch, 64);
@@ -74,7 +74,7 @@ public sealed class AutoRuntimeConfigurator
             ContextSize = context,
             Threads = workerThreads,
             ThreadsBatch = workerThreads,
-            GpuLayers = backend.UsesCuda ? "auto" : "0",
+            GpuLayers = backend.UsesGpu ? "auto" : "0",
             BatchSize = batch,
             UBatchSize = ubatch,
             FlashAttention = "auto",
@@ -88,7 +88,7 @@ public sealed class AutoRuntimeConfigurator
 
         var reason = $"Auto Runtime: {logical} лог. CPU -> {workerThreads} рабочих потоков; " +
                      $"RAM {totalRamMb / 1024.0:0.#} ГБ, свободно {availableRamMb / 1024.0:0.#} ГБ; модель {modelSizeMb / 1024.0:0.00} ГБ; " +
-                     $"context {context}; batch {batch}/{ubatch}; GPU layers {(backend.UsesCuda ? "llama.cpp auto-fit" : "off")}.";
+                     $"context {context}; batch {batch}/{ubatch}; GPU layers {(backend.UsesGpu ? "llama.cpp auto-fit" : "off")}.";
 
         return new AutoRuntimeProfile
         {
@@ -103,7 +103,7 @@ public sealed class AutoRuntimeConfigurator
         var r = profile.Runtime;
         return "AUTO-RUNTIME " +
                $"cpu=\"{hw.CpuName}\" logical={hw.LogicalProcessors} avx={hw.Avx} avx2={hw.Avx2} " +
-               $"ram_mb={hw.TotalRamMb} ram_available_mb={hw.AvailableRamMb} gpu=\"{hw.GpuName}\" vram_mb={hw.GpuVramMb} cc=\"{hw.ComputeCapability}\" " +
+               $"ram_mb={hw.TotalRamMb} ram_available_mb={hw.AvailableRamMb} gpu=\"{hw.GpuName}\" gpu_vendor=\"{hw.GpuVendor}\" vram_mb={hw.GpuVramMb} cc=\"{hw.ComputeCapability}\" " +
                $"backend=\"{backend.Name}\" model_mb={profile.ModelSizeMb} context={r.ContextSize} " +
                $"threads={r.Threads} threads_batch={r.ThreadsBatch} batch={r.BatchSize} ubatch={r.UBatchSize} " +
                $"gpu_layers={r.GpuLayers} flash={r.FlashAttention} cache_k={r.CacheTypeK} cache_v={r.CacheTypeV} " +

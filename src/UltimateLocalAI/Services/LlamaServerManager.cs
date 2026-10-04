@@ -61,7 +61,7 @@ public sealed class LlamaServerManager : IAsyncDisposable
         if (string.Equals(config.BackendMode, "Auto", StringComparison.OrdinalIgnoreCase))
             Add(psi, "--no-warmup");
 
-        if (backend.UsesCuda)
+        if (backend.UsesGpu)
         {
             var gpuLayers = config.Runtime.GpuLayers?.Trim();
             // llama.cpp b11060 уже использует GPU layers=auto и --fit=on по умолчанию.

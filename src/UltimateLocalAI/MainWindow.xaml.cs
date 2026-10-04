@@ -288,11 +288,12 @@ public partial class MainWindow : Window
 
     private string DescribeActiveBackend(BackendChoice backend)
     {
-        if (backend.UsesCuda)
+        if (backend.UsesGpu)
         {
             var offload = _server.GpuOffloadSummary;
+            var backendKind = backend.UsesCuda ? "CUDA" : "GPU";
             var detail = string.IsNullOrWhiteSpace(offload)
-                ? "CUDA backend активен; число GPU-слоёв см. в Logs"
+                ? $"{backendKind} backend активен; число GPU-слоёв см. в Logs"
                 : offload;
             return $"Активный backend: {backend.Name} · GPU: {_hardware.GpuName} · {detail}";
         }
@@ -334,7 +335,7 @@ public partial class MainWindow : Window
             {
                 await _server.StartAsync(backend, launchConfig);
             }
-            catch (Exception ex) when (backend.UsesCuda && _config.AutoFallbackToCpu)
+            catch (Exception ex) when (backend.UsesGpu && _config.AutoFallbackToCpu)
             {
                 LogService.Warn("CUDA backend failed, CPU fallback: " + ex.Message);
                 var cpu = _backendSelector.CpuFallback(_hardware, _config);

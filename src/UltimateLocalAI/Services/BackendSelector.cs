@@ -31,6 +31,13 @@ public sealed class BackendSelector
             if (cuda is not null) return cuda;
         }
 
+        if (hw.GpuDetected && hw.Avx2)
+        {
+            var vulkan = CandidateWithLatestFallback(config, "vulkan-avx2", "Vulkan GPU + CPU AVX2", false,
+                $"GPU {hw.GpuVendor} обнаружена. CUDA-профиль не подходит; пробуем универсальный Vulkan backend.", usesGpu: true);
+            if (vulkan is not null) return vulkan;
+        }
+
         if (hw.Avx2)
             return Candidate(config, "cpu-avx2", "CPU AVX2", false, "GPU backend недоступен или не собран; используется AVX2 CPU backend.");
         if (hw.Avx)
@@ -55,26 +62,27 @@ public sealed class BackendSelector
         _ => hw.Avx2 ? Candidate(config, "cpu-avx2", "CPU AVX2", false, "Неизвестный режим; fallback AVX2.") : Candidate(config, "cpu-avx", "CPU AVX", false, "Неизвестный режим; fallback AVX.")
     };
 
-    private static BackendChoice? CandidateWithLatestFallback(AppConfig config, string folder, string name, bool cuda, string reason)
+    private static BackendChoice? CandidateWithLatestFallback(AppConfig config, string folder, string name, bool cuda, string reason, bool? usesGpu = null)
     {
-        var primary = Candidate(config, folder, name, cuda, reason);
+        var primary = Candidate(config, folder, name, cuda, reason, usesGpu: usesGpu);
         if (File.Exists(primary.ExecutablePath)) return primary;
 
         if (string.Equals(config.RuntimeChannel, "Stable", StringComparison.OrdinalIgnoreCase))
         {
             var latest = Candidate(config, folder, name + " [Latest]", cuda,
-                reason + " В Stable backend отсутствует, автоматически использован упакованный Latest runtime.", "Latest");
+                reason + " В Stable backend отсутствует, автоматически использован упакованный Latest runtime.", "Latest", usesGpu);
             if (File.Exists(latest.ExecutablePath)) return latest;
         }
 
         return null;
     }
 
-    private static BackendChoice Candidate(AppConfig config, string folder, string name, bool cuda, string reason, string? runtimeChannel = null) => new()
+    private static BackendChoice Candidate(AppConfig config, string folder, string name, bool cuda, string reason, string? runtimeChannel = null, bool? usesGpu = null) => new()
     {
         Name = name,
         ExecutablePath = Path.Combine(AppPaths.ResolveBackendsDir(runtimeChannel ?? config.RuntimeChannel, config.CustomRuntimePath), folder, "llama-server.exe"),
         UsesCuda = cuda,
+        UsesGpu = usesGpu ?? cuda,
         Reason = reason
     };
 

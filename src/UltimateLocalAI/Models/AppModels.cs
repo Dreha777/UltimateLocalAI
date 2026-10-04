@@ -126,6 +126,8 @@ public sealed class HardwareInfo
     public string GpuName { get; set; } = "Не обнаружена";
     public int GpuVramMb { get; set; }
     public string ComputeCapability { get; set; } = "";
+    public bool GpuDetected { get; set; }
+    public string GpuVendor { get; set; } = "";
     public bool NvidiaDetected { get; set; }
 
     public string ShortSummary => $"{CpuName}\nRAM: {TotalRamMb / 1024.0:0.#} ГБ · AVX {(Avx ? "✓" : "✗")} · AVX2 {(Avx2 ? "✓" : "✗")}\nGPU: {GpuName}";
@@ -136,6 +138,7 @@ public sealed class BackendChoice
     public string Name { get; set; } = "";
     public string ExecutablePath { get; set; } = "";
     public bool UsesCuda { get; set; }
+    public bool UsesGpu { get; set; }
     public string Reason { get; set; } = "";
 }
 
