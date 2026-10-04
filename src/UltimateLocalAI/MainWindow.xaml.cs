@@ -776,7 +776,7 @@ public partial class MainWindow : Window
         _config.CustomRuntimePath = "";
         _config.WorkspaceBackground = "Светло-серый";
         LoadSettingsToUi();
-        ApplyWorkspaceBackground(_config.WorkspaceBackground);
+        ApplyApplicationTheme(_config.WorkspaceBackground);
     }
 
 
