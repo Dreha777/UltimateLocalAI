@@ -24,7 +24,7 @@ Ultimate Local AI uses .NET 8 / WPF for the Windows graphical application and se
 
 - Package: WpfMath 2.1.0
 - Project: XAML-Math / WPF-Math
-- License: MIT and OFL-1.1 for applicable bundled font assets
+- License: project code/resources under MIT; bundled font assets include Knuth License and SIL Open Font License (OFL) terms as documented by XAML-Math
 - Purpose: local rendering of LaTeX mathematical formulae in chat.
 
 ## PDFsharp / MigraDoc
