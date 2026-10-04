@@ -24,10 +24,10 @@
                 <StackPanel>
                     <TextBlock Text="О ПРОГРАММЕ" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedBrush}"/>
                     <TextBlock Margin="0,8,0,0" FontSize="14" TextWrapping="Wrap">
-                        <Run Text="Разработчик: "/><Run Text="Dreha777" FontWeight="SemiBold"/>
+                        <Run Text="Разработчик: "/><Run Text="Яхлов Андрей Васильевич" FontWeight="SemiBold"/>
                     </TextBlock>
                     <TextBlock Margin="0,6,0,0" FontSize="14" TextWrapping="Wrap"
-                               Text="Назначение: локальный запуск и использование GGUF-моделей искусственного интеллекта на Windows без отправки запросов в облачный сервис. Программа запускает llama.cpp, автоматически определяет возможности ПК и подбирает совместимый CPU/GPU backend и безопасные параметры работы."/>
+                               Text="Назначение: автономный локальный запуск и использование GGUF-моделей искусственного интеллекта на Windows. Проект создан по личной инициативе разработчика для рабочих условий с отсутствующим или ограниченным доступом в интернет и сравнительно маломощными или разнородными ПК. Программа автоматически определяет возможности компьютера и подбирает совместимый CPU/GPU backend и безопасные runtime-параметры."/>
 
                     <TextBlock Text="АВТОМАТИЧЕСКИЙ ВЫБОР ОБОРУДОВАНИЯ" FontSize="11" FontWeight="Bold"
                                Foreground="{DynamicResource MutedBrush}" Margin="0,22,0,0"/>
@@ -54,13 +54,19 @@
                     <TextBlock Margin="0,8,0,0" FontSize="14" TextWrapping="Wrap"
                                Text="Stable — проверенная версия llama.cpp. Latest — более новый runtime для новых GGUF и GPU. Custom — внешний runtime пользователя. В Portable включены CPU AVX/AVX2, CUDA-профили и Vulkan AVX/AVX2. Точный набор зависит от конкретной сборки."/>
 
-                    <TextBlock Text="Сторонний движок: llama.cpp (ggml-org). Условия и уведомления — THIRD_PARTY_NOTICES.md."
-                               FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,22,0,4"/>
+                    <TextBlock Text="ОТКРЫТЫЕ КОМПОНЕНТЫ" FontSize="11" FontWeight="Bold"
+                               Foreground="{DynamicResource MutedBrush}" Margin="0,22,0,0"/>
+                    <TextBlock Margin="0,8,0,4" FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"
+                               Text="Программа разработана с использованием открытых компонентов. Ключевой inference-движок llama.cpp распространяется по лицензии MIT. Условия использования сторонних компонентов приведены в THIRD_PARTY_NOTICES.md. GGUF-модели в состав программы не входят и могут иметь собственные лицензии."/>
                 </StackPanel>
             </ScrollViewer>
         </Border>
 
-        <Button Grid.Row="2" Style="{StaticResource AccentButton}" Content="Закрыть"
-                Width="110" HorizontalAlignment="Right" Margin="0,16,4,0" Click="Close_Click"/>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,4,0">
+            <Button Style="{StaticResource SoftButton}" Content="Открыть инструкцию"
+                    Padding="16,8" Margin="0,0,8,0" Click="OpenGuide_Click"/>
+            <Button Style="{StaticResource AccentButton}" Content="Закрыть"
+                    Width="110" Click="Close_Click"/>
+        </StackPanel>
     </Grid>
 </Window>
