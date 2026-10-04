@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     private readonly ChatRepository _chatRepo = new();
     private readonly HardwareDetector _hardwareDetector = new();
     private readonly BackendSelector _backendSelector = new();
+    private readonly AutoRuntimeConfigurator _autoRuntimeConfigurator = new();
     private readonly LlamaServerManager _server = new();
     private readonly LlamaApiClient _api = new();
     private readonly FileTextExtractor _extractor = new();
@@ -27,6 +28,7 @@ public partial class MainWindow : Window
     private ChatSession? _currentChat;
     private CancellationTokenSource? _generationCts;
     private bool _loadingChat;
+    private int _activeContextSize = 4096;
 
     public ObservableCollection<ChatSession> Chats { get; } = [];
     public ObservableCollection<UiMessage> Messages { get; } = [];
@@ -40,6 +42,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = this;
         _config = _configService.Load();
+        _activeContextSize = Math.Max(512, _config.Runtime.ContextSize);
         _knowledge = new KnowledgeBaseService(_extractor);
         _server.StatusChanged += s => Dispatcher.Invoke(() => RuntimeStatusText.Text = s);
         Loaded += MainWindow_Loaded;
@@ -240,18 +243,20 @@ public partial class MainWindow : Window
         try
         {
             var backend = _backendSelector.Select(_hardware, _config);
+            var launchConfig = CreateLaunchConfig(backend);
             TitleStatusText.Text = "Загрузка модели…";
             BackendText.Text = backend.Name + " · " + backend.Reason;
             try
             {
-                await _server.StartAsync(backend, _config);
+                await _server.StartAsync(backend, launchConfig);
             }
             catch (Exception ex) when (backend.UsesCuda && _config.AutoFallbackToCpu)
             {
                 LogService.Warn("CUDA backend failed, CPU fallback: " + ex.Message);
                 var cpu = _backendSelector.CpuFallback(_hardware, _config);
+                launchConfig = CreateLaunchConfig(cpu);
                 BackendText.Text = $"{cpu.Name} · CUDA не запустилась, применён безопасный CPU fallback";
-                await _server.StartAsync(cpu, _config);
+                await _server.StartAsync(cpu, launchConfig);
             }
             TitleStatusText.Text = "Модель готова";
             StartButton.Content = "Перезапустить";
@@ -274,6 +279,38 @@ public partial class MainWindow : Window
             return false;
         }
         finally { StartButton.IsEnabled = true; }
+    }
+
+    private AppConfig CreateLaunchConfig(BackendChoice backend)
+    {
+        if (!string.Equals(_config.BackendMode, "Auto", StringComparison.OrdinalIgnoreCase))
+        {
+            _activeContextSize = Math.Max(512, _config.Runtime.ContextSize);
+            LogService.Info(
+                $"MANUAL-RUNTIME backend=\"{backend.Name}\" context={_config.Runtime.ContextSize} " +
+                $"threads={_config.Runtime.Threads} threads_batch={_config.Runtime.ThreadsBatch} " +
+                $"batch={_config.Runtime.BatchSize} ubatch={_config.Runtime.UBatchSize} gpu_layers={_config.Runtime.GpuLayers} " +
+                $"priority={_config.Runtime.Priority}");
+            return _config;
+        }
+
+        var profile = _autoRuntimeConfigurator.Create(_hardware, backend, _config.Runtime, _config.ModelPath);
+        _activeContextSize = profile.Runtime.ContextSize;
+        LogService.Info(AutoRuntimeConfigurator.ToLogLine(_hardware, backend, profile));
+
+        return new AppConfig
+        {
+            ModelPath = _config.ModelPath,
+            BackendMode = _config.BackendMode,
+            RuntimeChannel = _config.RuntimeChannel,
+            CustomRuntimePath = _config.CustomRuntimePath,
+            Port = _config.Port,
+            AutoStartLastModel = _config.AutoStartLastModel,
+            AutoFallbackToCpu = _config.AutoFallbackToCpu,
+            UseKnowledgeBase = _config.UseKnowledgeBase,
+            Runtime = profile.Runtime,
+            Generation = _config.Generation
+        };
     }
 
     private async void Attach_Click(object sender, RoutedEventArgs e)
@@ -322,7 +359,7 @@ public partial class MainWindow : Window
 
         var attachments = PendingAttachments.ToList();
         var context = new StringBuilder();
-        var contextBudgetChars = Math.Max(4_000, _config.Runtime.ContextSize * 2);
+        var contextBudgetChars = Math.Max(4_000, _activeContextSize * 2);
         var remainingChars = contextBudgetChars;
         foreach (var a in attachments)
         {
