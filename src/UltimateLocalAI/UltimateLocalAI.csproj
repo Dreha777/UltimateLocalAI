@@ -10,8 +10,8 @@
     <RootNamespace>UltimateLocalAI</RootNamespace>
     <LangVersion>latest</LangVersion>
     <Product>Ultimate Local AI</Product>
-    <Authors>Dreha777</Authors>
-    <Description>Портативный Windows-клиент для локального запуска GGUF-моделей через llama.cpp с автоматическим подбором CPU/GPU backend и параметров.</Description>
-    <Copyright>Copyright © Dreha777</Copyright>
+    <Authors>Яхлов Андрей Васильевич</Authors>
+    <Description>Портативный офлайн Windows-клиент для локального запуска GGUF-моделей через llama.cpp с автоматическим подбором CPU/GPU backend и параметров для разнородных и маломощных ПК.</Description>
+    <Copyright>Copyright © Яхлов Андрей Васильевич</Copyright>
   </PropertyGroup>
 </Project>
