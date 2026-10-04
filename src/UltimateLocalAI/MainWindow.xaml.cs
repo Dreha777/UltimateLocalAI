@@ -625,15 +625,22 @@ public partial class MainWindow : Window
     {
         var palette = mode switch
         {
-            "Белый" => ("#FFFFFF", "#F5F5F7", "#FAFAFA", "#FFFFFF"),
-            "Тёплый" => ("#F6F1E7", "#EEE6D8", "#F3EDE3", "#FFFDF8"),
-            "Холодный" => ("#EEF3F8", "#E2EAF2", "#E8EFF6", "#F8FBFE"),
-            _ => ("#F5F5F7", "#ECECF1", "#ECECF1", "#FFFFFF")
+            "Белый" => ("#FFFFFF", "#F5F5F7", "#FAFAFA", "#FFFFFF", "#1D1D1F", "#6E6E73", "#D8D8DE", "#EFEFF4", "#FFFFFF", "#EEF5FF"),
+            "Тёплый" => ("#F6F1E7", "#EEE6D8", "#F3EDE3", "#FFFDF8", "#211F1B", "#716B61", "#D8CCBA", "#ECE3D5", "#FFFDF8", "#F0E8DA"),
+            "Холодный" => ("#EEF3F8", "#E2EAF2", "#E8EFF6", "#F8FBFE", "#18212B", "#62717F", "#C8D4DF", "#E1EAF2", "#F8FBFE", "#E4EEF8"),
+            "Очень тёмный" => ("#0D0F12", "#12151A", "#0F1216", "#171A20", "#F2F4F7", "#969DA8", "#303640", "#22262E", "#1C2027", "#202733"),
+            _ => ("#F5F5F7", "#ECECF1", "#ECECF1", "#FFFFFF", "#1D1D1F", "#6E6E73", "#D8D8DE", "#EFEFF4", "#FFFFFF", "#EEF5FF")
         };
 
         SetBrushColor("BgBrush", palette.Item1);
         SetBrushColor("SidebarBrush", palette.Item2);
         SetBrushColor("PanelBrush", palette.Item4);
+        SetBrushColor("TextBrush", palette.Item5);
+        SetBrushColor("MutedBrush", palette.Item6);
+        SetBrushColor("BorderBrush", palette.Item7);
+        SetBrushColor("ControlBrush", palette.Item8);
+        SetBrushColor("AssistantBubbleBrush", palette.Item9);
+        SetBrushColor("AttachmentBrush", palette.Item10);
         Background = BrushFromHex(palette.Item1);
         ChatSurface.Background = BrushFromHex(palette.Item3);
     }
