@@ -44,7 +44,12 @@ public partial class MainWindow : Window
         _config = _configService.Load();
         _activeContextSize = Math.Max(512, _config.Runtime.ContextSize);
         _knowledge = new KnowledgeBaseService(_extractor);
-        _server.StatusChanged += s => Dispatcher.Invoke(() => RuntimeStatusText.Text = s);
+        _server.StatusChanged += s => Dispatcher.Invoke(() =>
+        {
+            RuntimeStatusText.Text = s;
+            if (ModelLoadProgress.Visibility == Visibility.Visible)
+                TitleStatusText.Text = s;
+        });
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
     }
@@ -229,6 +234,54 @@ public partial class MainWindow : Window
 
     private async void StartModel_Click(object sender, RoutedEventArgs e) => await StartModelInternalAsync(showErrors: true);
 
+    private async void UnloadModel_Click(object sender, RoutedEventArgs e)
+    {
+        _generationCts?.Cancel();
+        StartButton.IsEnabled = false;
+        UnloadButton.IsEnabled = false;
+        SendButton.IsEnabled = false;
+        ModelLoadProgress.Visibility = Visibility.Collapsed;
+        TitleStatusText.Text = "Выгрузка модели…";
+        RuntimeStatusText.Text = "Остановка llama-server…";
+
+        try
+        {
+            await _server.StopAsync();
+            TitleStatusText.Text = "Модель выгружена";
+            RuntimeStatusText.Text = "Backend не запущен";
+            StartButton.Content = "Запустить";
+            RefreshModelHeader();
+            PerfText.Text = "";
+        }
+        catch (Exception ex)
+        {
+            LogService.Error("Model unload failed", ex);
+            TitleStatusText.Text = "Ошибка выгрузки";
+            RuntimeStatusText.Text = "Ошибка остановки backend";
+            MessageBox.Show(ex.Message, "Не удалось выгрузить модель", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            StartButton.IsEnabled = true;
+            UnloadButton.IsEnabled = _server.IsRunning;
+            SendButton.IsEnabled = _server.IsRunning && _generationCts is null;
+        }
+    }
+
+    private string DescribeActiveBackend(BackendChoice backend)
+    {
+        if (backend.UsesCuda)
+        {
+            var offload = _server.GpuOffloadSummary;
+            var detail = string.IsNullOrWhiteSpace(offload)
+                ? "CUDA backend активен; число GPU-слоёв см. в Logs"
+                : offload;
+            return $"Активный backend: {backend.Name} · GPU: {_hardware.GpuName} · {detail}";
+        }
+
+        return $"Активный backend: {backend.Name} · вычисления на CPU";
+    }
+
     private async Task<bool> StartModelInternalAsync(bool showErrors)
     {
         if (!File.Exists(_config.ModelPath))
@@ -240,9 +293,14 @@ public partial class MainWindow : Window
         ApplySettingsFromUi(save: true);
         StartButton.IsEnabled = false;
         SendButton.IsEnabled = false;
+        UnloadButton.IsEnabled = false;
+        ModelLoadProgress.Visibility = Visibility.Visible;
+        PerfText.Text = "";
+        BackendChoice? activeBackend = null;
         try
         {
             var backend = _backendSelector.Select(_hardware, _config);
+            activeBackend = backend;
             var launchConfig = CreateLaunchConfig(backend);
             TitleStatusText.Text = "Загрузка модели…";
             BackendText.Text = backend.Name + " · " + backend.Reason;
@@ -254,21 +312,31 @@ public partial class MainWindow : Window
             {
                 LogService.Warn("CUDA backend failed, CPU fallback: " + ex.Message);
                 var cpu = _backendSelector.CpuFallback(_hardware, _config);
+                activeBackend = cpu;
                 launchConfig = CreateLaunchConfig(cpu);
                 BackendText.Text = $"{cpu.Name} · CUDA не запустилась, применён безопасный CPU fallback";
                 await _server.StartAsync(cpu, launchConfig);
             }
             TitleStatusText.Text = "Модель готова";
+            ModelLoadProgress.Visibility = Visibility.Collapsed;
             StartButton.Content = "Перезапустить";
+            UnloadButton.IsEnabled = true;
             SendButton.IsEnabled = true;
+            if (activeBackend is not null)
+                BackendText.Text = DescribeActiveBackend(activeBackend);
             PromptBox.Focus();
             return true;
         }
         catch (Exception ex)
         {
             LogService.Error("Model start failed", ex);
+            await _server.StopAsync();
             TitleStatusText.Text = "Ошибка загрузки";
             RuntimeStatusText.Text = "Backend не запущен";
+            ModelLoadProgress.Visibility = Visibility.Collapsed;
+            StartButton.Content = "Запустить";
+            UnloadButton.IsEnabled = false;
+            SendButton.IsEnabled = false;
             if (showErrors)
             {
                 var hint = ex is FileNotFoundException && ex.Message.Contains("Backend", StringComparison.OrdinalIgnoreCase)

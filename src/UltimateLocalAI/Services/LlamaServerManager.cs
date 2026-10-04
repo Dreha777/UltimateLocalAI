@@ -12,6 +12,7 @@ public sealed class LlamaServerManager : IAsyncDisposable
     private DateTime _lastBackendLineUtc;
     public bool IsRunning => _process is { HasExited: false };
     public BackendChoice? CurrentBackend { get; private set; }
+    public string GpuOffloadSummary { get; private set; } = "";
     public event Action<string>? StatusChanged;
 
     public async Task StartAsync(BackendChoice backend, AppConfig config, CancellationToken ct = default)
@@ -81,6 +82,7 @@ public sealed class LlamaServerManager : IAsyncDisposable
 
         _lastBackendLine = "";
         _lastBackendLineUtc = default;
+        GpuOffloadSummary = "";
 
         var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
         _process = process;
@@ -174,6 +176,15 @@ public sealed class LlamaServerManager : IAsyncDisposable
         if (string.IsNullOrWhiteSpace(line)) return;
         _lastBackendLine = line.Trim();
         _lastBackendLineUtc = DateTime.UtcNow;
+
+        if (_lastBackendLine.Contains("offloaded", StringComparison.OrdinalIgnoreCase) &&
+            _lastBackendLine.Contains("layers to GPU", StringComparison.OrdinalIgnoreCase))
+        {
+            var start = _lastBackendLine.IndexOf("offloaded", StringComparison.OrdinalIgnoreCase);
+            GpuOffloadSummary = start >= 0 ? _lastBackendLine[start..] : _lastBackendLine;
+            LogService.Info("GPU-OFFLOAD " + GpuOffloadSummary);
+        }
+
         LogService.Info("llama: " + _lastBackendLine);
     }
 

@@ -79,16 +79,21 @@
                 <Grid.RowDefinitions><RowDefinition Height="64"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="30"/></Grid.RowDefinitions>
 
                 <Grid Grid.Row="0" VerticalAlignment="Center">
+                    <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="4"/></Grid.RowDefinitions>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <StackPanel VerticalAlignment="Center">
+                    <StackPanel Grid.Row="0" VerticalAlignment="Center">
                         <TextBlock x:Name="ModelNameText" Text="Модель не выбрана" FontSize="17" FontWeight="SemiBold"/>
                         <TextBlock x:Name="BackendText" Text="Выберите GGUF-файл" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,2,0,0"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button Style="{StaticResource SoftButton}" Content="Выбрать GGUF" Click="SelectModel_Click" Margin="0,0,8,0"/>
                         <Button x:Name="StartButton" Style="{StaticResource AccentButton}" Content="Запустить" Click="StartModel_Click" Margin="0,0,8,0"/>
+                        <Button x:Name="UnloadButton" Style="{StaticResource SoftButton}" Content="Выгрузить" Click="UnloadModel_Click" IsEnabled="False" Margin="0,0,8,0" ToolTip="Остановить llama-server и освободить RAM/VRAM"/>
                         <Button Style="{StaticResource SoftButton}" Content="⚙" FontSize="17" Width="42" Click="Settings_Click" ToolTip="Настройки модели"/>
                     </StackPanel>
+                    <ProgressBar x:Name="ModelLoadProgress" Grid.Row="1" Grid.ColumnSpan="2"
+                                 Height="3" Margin="0,0,0,0" Minimum="0" Maximum="100"
+                                 IsIndeterminate="True" Visibility="Collapsed"/>
                 </Grid>
 
                 <Border Grid.Row="1" Background="#ECECF1" CornerRadius="16" Padding="1" BorderBrush="#E2E2E7" BorderThickness="1">
