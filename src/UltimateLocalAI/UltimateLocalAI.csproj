@@ -9,5 +9,9 @@
     <AssemblyName>UltimateLocalAI</AssemblyName>
     <RootNamespace>UltimateLocalAI</RootNamespace>
     <LangVersion>latest</LangVersion>
+    <Product>Ultimate Local AI</Product>
+    <Authors>Dreha777</Authors>
+    <Description>Портативный Windows-клиент для локального запуска GGUF-моделей через llama.cpp с автоматическим подбором CPU/GPU backend и параметров.</Description>
+    <Copyright>Copyright © Dreha777</Copyright>
   </PropertyGroup>
 </Project>

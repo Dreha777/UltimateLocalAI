@@ -1,0 +1,66 @@
+<Window x:Class="UltimateLocalAI.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Справка / О программе — Ultimate Local AI"
+        Width="760" Height="720" MinWidth="620" MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource BgBrush}">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Margin="4,0,4,16">
+            <TextBlock Text="Ultimate Local AI" FontSize="26" FontWeight="SemiBold"/>
+            <TextBlock Text="Локальный интерфейс для GGUF-моделей на llama.cpp" FontSize="13"
+                       Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <Border Grid.Row="1" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1" CornerRadius="14" Padding="20">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Text="О ПРОГРАММЕ" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedBrush}"/>
+                    <TextBlock Margin="0,8,0,0" FontSize="14" TextWrapping="Wrap">
+                        <Run Text="Разработчик: "/><Run Text="Dreha777" FontWeight="SemiBold"/>
+                    </TextBlock>
+                    <TextBlock Margin="0,6,0,0" FontSize="14" TextWrapping="Wrap"
+                               Text="Назначение: локальный запуск и использование GGUF-моделей искусственного интеллекта на Windows без отправки запросов в облачный сервис. Программа запускает llama.cpp, автоматически определяет возможности ПК и подбирает совместимый CPU/GPU backend и безопасные параметры работы."/>
+
+                    <TextBlock Text="АВТОМАТИЧЕСКИЙ ВЫБОР ОБОРУДОВАНИЯ" FontSize="11" FontWeight="Bold"
+                               Foreground="{DynamicResource MutedBrush}" Margin="0,22,0,0"/>
+                    <TextBlock Margin="0,8,0,0" FontSize="14" TextWrapping="Wrap"
+                               Text="В режиме Auto программа определяет AVX/AVX2, число логических процессоров, общий и свободный объём RAM, видеокарту и доступный GPU backend. Приоритет: совместимый NVIDIA CUDA → Vulkan для AMD/Intel/других совместимых GPU → CPU AVX2 → CPU AVX. Контекст, потоки, batch и GPU offload подбираются автоматически с учётом памяти."/>
+
+                    <TextBlock Text="БЫСТРЫЙ СТАРТ" FontSize="11" FontWeight="Bold"
+                               Foreground="{DynamicResource MutedBrush}" Margin="0,22,0,0"/>
+                    <TextBlock Margin="0,8,0,0" FontSize="14" TextWrapping="Wrap"
+                               Text="1. Нажмите «Выбрать GGUF» и укажите файл модели .gguf.&#x0a;2. Оставьте Backend = Auto. Для обычной работы ручные параметры не требуются.&#x0a;3. Нажмите «Запустить». Дождитесь состояния «Модель готова».&#x0a;4. Введите запрос в нижнее поле. Enter — отправить, Shift+Enter — новая строка.&#x0a;5. Кнопка «Выгрузить» завершает llama-server и освобождает RAM/VRAM.&#x0a;6. Для файлов используйте кнопку «＋». База знаний открывается отдельной кнопкой слева."/>
+
+                    <TextBlock Text="ЕСЛИ ПК СЛАБЫЙ" FontSize="11" FontWeight="Bold"
+                               Foreground="{DynamicResource MutedBrush}" Margin="0,22,0,0"/>
+                    <TextBlock Margin="0,8,0,0" FontSize="14" TextWrapping="Wrap"
+                               Text="Оставьте Auto. Программа резервирует память для Windows и снижает context/batch при малом объёме или дефиците свободной RAM. На старых CPU используется AVX-backend, если AVX2 отсутствует. Если GPU backend не запускается и включён fallback, программа пробует безопасный CPU backend."/>
+
+                    <TextBlock Text="ДИАГНОСТИКА И ДАННЫЕ" FontSize="11" FontWeight="Bold"
+                               Foreground="{DynamicResource MutedBrush}" Margin="0,22,0,0"/>
+                    <TextBlock Margin="0,8,0,0" FontSize="14" TextWrapping="Wrap"
+                               Text="Logs\localai_YYYYMMDD.log — журнал запуска backend, загрузки модели и ошибок.&#x0a;Data\config.json — настройки.&#x0a;Data\chats.json — история чатов.&#x0a;Data\knowledge.json — локальная база знаний.&#x0a;&#x0a;Для диагностики достаточно прислать последний файл из папки Logs."/>
+
+                    <TextBlock Text="RUNTIME" FontSize="11" FontWeight="Bold"
+                               Foreground="{DynamicResource MutedBrush}" Margin="0,22,0,0"/>
+                    <TextBlock Margin="0,8,0,0" FontSize="14" TextWrapping="Wrap"
+                               Text="Stable — проверенная версия llama.cpp. Latest — более новый runtime для новых GGUF и GPU. Custom — внешний runtime пользователя. В Portable включены CPU AVX/AVX2, CUDA-профили и Vulkan AVX/AVX2. Точный набор зависит от конкретной сборки."/>
+
+                    <TextBlock Text="Сторонний движок: llama.cpp (ggml-org). Условия и уведомления — THIRD_PARTY_NOTICES.md."
+                               FontSize="12" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,22,0,4"/>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <Button Grid.Row="2" Style="{StaticResource AccentButton}" Content="Закрыть"
+                Width="110" HorizontalAlignment="Right" Margin="0,16,4,0" Click="Close_Click"/>
+    </Grid>
+</Window>

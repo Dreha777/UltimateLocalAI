@@ -64,6 +64,7 @@
                     </ListBox>
                     <StackPanel Grid.Row="2">
                         <Button Style="{StaticResource SoftButton}" Content="▤  База знаний" HorizontalContentAlignment="Left" Click="Knowledge_Click" Margin="0,6,0,6"/>
+                        <Button Style="{StaticResource SoftButton}" Content="ⓘ  Справка / О программе" HorizontalContentAlignment="Left" Click="About_Click" Margin="0,0,0,6"/>
                         <Border Background="{DynamicResource PanelBrush}" CornerRadius="12" Padding="10" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Margin="0,0,0,6">
                             <StackPanel>
                                 <TextBlock Text="РЕСУРСЫ СИСТЕМЫ" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource MutedBrush}"/>

@@ -51,6 +51,8 @@ jobs:
           $zip = "dist/UltimateLocalAI-GUI-Patch.zip"
           New-Item -ItemType Directory -Force $patchDir | Out-Null
           Copy-Item $dll.FullName (Join-Path $patchDir "UltimateLocalAI.dll") -Force
+          Copy-Item "FIRST_START_RU.txt" (Join-Path $patchDir "FIRST_START_RU.txt") -Force
+          Copy-Item "USER_GUIDE_RU.txt" (Join-Path $patchDir "USER_GUIDE_RU.txt") -Force
 
           $pdb = [System.IO.Path]::ChangeExtension($dll.FullName, ".pdb")
           if (Test-Path $pdb) {
@@ -162,6 +164,7 @@ jobs:
             "src/UltimateLocalAI/UltimateLocalAI.csproj",
             "scripts/Build-GitHub.ps1",
             "FIRST_START_RU.txt",
+            "USER_GUIDE_RU.txt",
             "THIRD_PARTY_NOTICES.md",
             "vendor/llama-stable/CMakeLists.txt",
             "vendor/llama-latest/CMakeLists.txt"

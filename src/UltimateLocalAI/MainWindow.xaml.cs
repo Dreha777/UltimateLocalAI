@@ -820,6 +820,12 @@ public partial class MainWindow : Window
         }
     }
 
+    private void About_Click(object sender, RoutedEventArgs e)
+    {
+        var window = new AboutWindow { Owner = this };
+        window.ShowDialog();
+    }
+
     private void Knowledge_Click(object sender, RoutedEventArgs e)
     {
         var win = new KnowledgeBaseWindow(_knowledge) { Owner = this };

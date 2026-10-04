@@ -104,6 +104,7 @@ Build-Backend $LatestSource 'latest' 'cuda-blackwell-avx2' $cudaBlackwell $true 
 # Portable writable directories and docs
 New-Item -ItemType Directory -Force -Path (Join-Path $Out 'Data'),(Join-Path $Out 'Logs') | Out-Null
 Copy-Item (Join-Path $Root 'FIRST_START_RU.txt') $Out -Force
+Copy-Item (Join-Path $Root 'USER_GUIDE_RU.txt') $Out -Force
 Copy-Item (Join-Path $Root 'THIRD_PARTY_NOTICES.md') $Out -Force
 @"
 Ultimate Local AI GitHub Build

@@ -2,6 +2,10 @@
 
 Портативный Windows-клиент для локальных GGUF-моделей на `llama.cpp`.
 
+**Разработчик:** Dreha777.
+
+**Назначение:** локальный запуск GGUF-моделей на Windows с автоматическим определением CPU/GPU, выбором совместимого backend и безопасных runtime-параметров без обязательной ручной настройки.
+
 ## Главное
 
 Собирать Visual Studio на своём ПК больше не требуется. GitHub Actions сам создаёт готовый portable-комплект.
@@ -24,7 +28,11 @@
 - `cpu-avx2` — i7-6700 и более новые x64 CPU;
 - `cuda-pascal-avx` — Pascal `sm_61`, в частности GTX 1050/1060, совместимо со старым AVX Xeon;
 - `cuda-modern-avx2` — Turing/Ampere/Ada (Latest, необязательная сборка);
-- `cuda-blackwell-avx2` — Blackwell (Latest, необязательная сборка).
+- `cuda-blackwell-avx2` — Blackwell (Latest, необязательная сборка);
+- `vulkan-avx` — универсальный Vulkan GPU fallback на AVX-only CPU (Latest);
+- `vulkan-avx2` — универсальный Vulkan GPU fallback на AVX2 CPU (Latest).
+
+Порядок Auto: совместимый NVIDIA CUDA → Vulkan → CPU AVX2 → CPU AVX.
 
 ## Модели
 
@@ -42,3 +50,11 @@
 ## Целевая конфигурация проекта
 
 Основной старый ПК: Xeon E3-1270 (AVX, без AVX2), 16 ГБ RAM, GTX 1050 2 ГБ Pascal. Для него GitHub Actions собирает отдельный CUDA `sm_61` backend через CUDA Toolkit 12.8.1.
+
+
+## Справка
+
+В интерфейсе доступно окно **«Справка / О программе»**. В Portable также находятся:
+- `FIRST_START_RU.txt` — краткий первый запуск;
+- `USER_GUIDE_RU.txt` — полное руководство пользователя;
+- `THIRD_PARTY_NOTICES.md` — уведомления о сторонних компонентах.
