@@ -22,12 +22,20 @@
                 BorderThickness="1" CornerRadius="14" Padding="20">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel>
-                    <TextBlock Text="О ПРОГРАММЕ" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedBrush}"/>
-                    <TextBlock Margin="0,8,0,0" FontSize="14" TextWrapping="Wrap">
-                        <Run Text="Разработчик: "/><Run Text="Яхлов Андрей Васильевич" FontWeight="SemiBold"/>
-                    </TextBlock>
-                    <TextBlock Margin="0,6,0,0" FontSize="14" TextWrapping="Wrap"
-                               Text="Назначение: автономный локальный запуск и использование GGUF-моделей искусственного интеллекта на Windows. Проект создан по личной инициативе разработчика для рабочих условий с отсутствующим или ограниченным доступом в интернет и сравнительно маломощными или разнородными ПК. Программа автоматически определяет возможности компьютера и подбирает совместимый CPU/GPU backend и безопасные runtime-параметры."/>
+                    <Border Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,0,0,18">
+                        <StackPanel>
+                            <TextBlock Text="АВТОР И РАЗРАБОТЧИК" FontSize="10" FontWeight="Bold"
+                                       Foreground="{DynamicResource MutedBrush}"/>
+                            <TextBlock Text="Яхлов Андрей Васильевич" FontSize="21" FontWeight="SemiBold" Margin="0,5,0,0"/>
+                            <TextBlock Text="Автор идеи, архитектуры и прикладной реализации Ultimate Local AI"
+                                       FontSize="12" Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Text="НАЗНАЧЕНИЕ" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedBrush}"/>
+                    <TextBlock Margin="0,8,0,0" FontSize="14" TextWrapping="Wrap"
+                               Text="Автономный локальный запуск и использование GGUF-моделей искусственного интеллекта на Windows. Проект создан по личной инициативе разработчика для рабочих условий с отсутствующим или ограниченным доступом в интернет и сравнительно маломощными или разнородными ПК. Программа автоматически определяет возможности компьютера и подбирает совместимый CPU/GPU backend и безопасные runtime-параметры."/>
 
                     <TextBlock Text="АВТОМАТИЧЕСКИЙ ВЫБОР ОБОРУДОВАНИЯ" FontSize="11" FontWeight="Bold"
                                Foreground="{DynamicResource MutedBrush}" Margin="0,22,0,0"/>
@@ -37,7 +45,7 @@
                     <TextBlock Text="БЫСТРЫЙ СТАРТ" FontSize="11" FontWeight="Bold"
                                Foreground="{DynamicResource MutedBrush}" Margin="0,22,0,0"/>
                     <TextBlock Margin="0,8,0,0" FontSize="14" TextWrapping="Wrap"
-                               Text="1. Нажмите «Выбрать GGUF» и укажите файл модели .gguf.&#x0a;2. Оставьте Backend = Auto. Для обычной работы ручные параметры не требуются.&#x0a;3. Нажмите «Запустить». Дождитесь состояния «Модель готова».&#x0a;4. Введите запрос в нижнее поле. Enter — отправить, Shift+Enter — новая строка.&#x0a;5. Кнопка «Выгрузить» завершает llama-server и освобождает RAM/VRAM.&#x0a;6. Для файлов используйте кнопку «＋». База знаний открывается отдельной кнопкой слева."/>
+                               Text="1. Нажмите «Выбрать GGUF» и укажите файл модели .gguf.&#x0a;2. Оставьте Backend = Auto. Для обычной работы ручные параметры не требуются.&#x0a;3. Нажмите «Запустить». Дождитесь состояния «Модель готова».&#x0a;4. Введите запрос в нижнее поле. Enter — отправить, Shift+Enter — новая строка.&#x0a;5. Кнопка «Выгрузить» завершает llama-server и освобождает RAM/VRAM.&#x0a;6. Для файлов используйте кнопку «＋». База знаний открывается отдельной кнопкой слева.&#x0a;7. «Экспорт» сохраняет текущий чат в Word-совместимый RTF или PDF. Кнопка «Копировать» есть у каждого сообщения."/>
 
                     <TextBlock Text="ЕСЛИ ПК СЛАБЫЙ" FontSize="11" FontWeight="Bold"
                                Foreground="{DynamicResource MutedBrush}" Margin="0,22,0,0"/>
