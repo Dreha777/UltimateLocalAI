@@ -1,0 +1,237 @@
+name: Publish v1.0.0 Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish-release:
+    if: contains(github.event.head_commit.message, '[publish-release-v1.0.0]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN_ID: "37216851218"
+      RELEASE_TAG: "v1.0.0"
+      RELEASE_TARGET: "7e20f92171a5c1b115313a4b4bf2eed9c79fd308"
+      MAX_RELEASE_ASSET_BYTES: "2147483648"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download verified Portable from build 37
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p fetched
+          gh run download "$SOURCE_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "UltimateLocalAI-Portable-ZIP" \
+            --dir fetched
+          test -f fetched/UltimateLocalAI-Portable.zip
+          echo "Downloaded verified build #37 artifact."
+
+      - name: Extract verified Portable
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p portable
+          unzip -q fetched/UltimateLocalAI-Portable.zip -d portable
+          rm -f fetched/UltimateLocalAI-Portable.zip
+          test -f portable/UltimateLocalAI.exe
+          test -d portable/backends
+          # Keep the corrected current third-party notice in distributed packages.
+          cp THIRD_PARTY_NOTICES.md portable/THIRD_PARTY_NOTICES.md
+          echo "Portable contents:"
+          du -sh portable
+          find portable/backends -maxdepth 2 -type d | sort
+
+      - name: Create draft release
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > RELEASE_NOTES.md <<'EOF'
+          ## Ultimate Local AI v1.0.0
+
+          **Первая публичная версия Ultimate Local AI.**
+
+          **Разработчик:** Яхлов Андрей Васильевич
+
+          Ultimate Local AI — портативное Windows-приложение для локального запуска GGUF-моделей искусственного интеллекта через `llama.cpp`. Проект создан по личной инициативе разработчика для работы в условиях отсутствующего или ограниченного интернета, в том числе на разнородных и сравнительно маломощных ПК.
+
+          ### Основные возможности
+
+          - полностью локальный streaming-чат без обязательного облачного сервиса;
+          - автоматическое определение CPU, AVX/AVX2, RAM и GPU;
+          - автоматический выбор совместимого backend;
+          - автоматическая настройка context, threads, batch/ubatch и GPU offload;
+          - поддержка старых AVX-only CPU и современных AVX2-систем;
+          - CUDA для совместимых NVIDIA GPU и Vulkan для AMD, Intel и других совместимых GPU;
+          - локальная история чатов, вложения, база знаний и диагностические журналы;
+          - мониторинг CPU/RAM/GPU/VRAM;
+          - несколько тем интерфейса, включая очень тёмную;
+          - отображение LaTeX-формул и цветных блоков программного кода;
+          - копирование отдельных сообщений;
+          - экспорт беседы в Word-совместимый RTF или PDF.
+
+          ### Какой архив скачать
+
+          Каждый архив ниже является **самостоятельной Portable-версией** и содержит CPU fallback.
+
+          - **CPU-Vulkan** — универсальный вариант для CPU, AMD/Intel GPU и Vulkan-совместимых видеокарт.
+          - **NVIDIA-Pascal** — для GTX 1050/1060/1070/1080 и совместимых Pascal GPU.
+          - **NVIDIA-RTX20-40** — для RTX 20/30/40, если этот backend успешно присутствует в проверенной сборке.
+          - **NVIDIA-RTX50** — для RTX 50 / Blackwell, если этот backend успешно присутствует в проверенной сборке.
+
+          Если не уверены, какой вариант нужен, начните с **CPU-Vulkan**.
+
+          ### Первый запуск
+
+          1. Скачайте подходящий ZIP из раздела **Assets**.
+          2. Полностью распакуйте архив в отдельную папку.
+          3. Запустите `UltimateLocalAI.exe`.
+          4. Нажмите **«Выбрать GGUF»** и укажите локальную модель `.gguf`.
+          5. Оставьте **Backend = Auto**.
+          6. Нажмите **«Запустить»** и дождитесь состояния **«Модель готова»**.
+
+          GGUF-модели **не входят** в состав программы и могут иметь собственные лицензии.
+
+          ### Конфиденциальность
+
+          Основная работа выполняется локально. GUI взаимодействует с локальным `llama-server` через loopback `127.0.0.1`; история чатов, настройки и база знаний сохраняются локально рядом с программой.
+
+          ### Сборка
+
+          Пакеты релиза сформированы из успешно прошедшей полной Portable-сборки **GitHub Actions #37**, включая smoke-check обязательных runtime-компонентов.
+
+          Подробная инструкция находится в `USER_GUIDE_RU.txt`, а сведения о сторонних компонентах и лицензиях — в `THIRD_PARTY_NOTICES.md`.
+          EOF
+
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists; refusing to overwrite it."
+            exit 1
+          fi
+
+          gh release create "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$RELEASE_TARGET" \
+            --title "Ultimate Local AI v1.0.0" \
+            --notes-file RELEASE_NOTES.md \
+            --draft
+
+      - name: Package and upload hardware variants
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          common_copy() {
+            local dst="$1"
+            mkdir -p "$dst"
+            shopt -s dotglob
+            for item in portable/*; do
+              if [[ "$(basename "$item")" != "backends" ]]; then
+                cp -a "$item" "$dst/"
+              fi
+            done
+            shopt -u dotglob
+            mkdir -p "$dst/backends/stable" "$dst/backends/latest"
+            cp -a portable/backends/stable/cpu-avx "$dst/backends/stable/"
+            cp -a portable/backends/stable/cpu-avx2 "$dst/backends/stable/"
+            cp -a portable/backends/latest/cpu-avx "$dst/backends/latest/"
+            cp -a portable/backends/latest/cpu-avx2 "$dst/backends/latest/"
+          }
+
+          add_backend() {
+            local src="$1"
+            local dst="$2"
+            if [[ -d "$src" ]]; then
+              mkdir -p "$(dirname "$dst")"
+              cp -a "$src" "$dst"
+              return 0
+            fi
+            return 1
+          }
+
+          package_variant() {
+            local variant="$1"
+            shift
+            local pkg="work/UltimateLocalAI-v1.0.0-$variant"
+            local zip="UltimateLocalAI-v1.0.0-$variant.zip"
+
+            rm -rf work
+            mkdir -p work
+            common_copy "$pkg"
+
+            local missing=0
+            while (( "$#" )); do
+              local src="$1"
+              local rel="$2"
+              shift 2
+              if ! add_backend "$src" "$pkg/$rel"; then
+                echo "Optional backend missing for $variant: $src"
+                missing=1
+              fi
+            done
+
+            if [[ "$missing" -eq 1 && "$variant" != "CPU-Vulkan" ]]; then
+              echo "Skipping $variant because its dedicated GPU backend is absent."
+              rm -rf work
+              return 0
+            fi
+
+            (cd work && zip -r -9 -q "../$zip" "$(basename "$pkg")")
+            local bytes
+            bytes=$(stat -c%s "$zip")
+            echo "$zip = $bytes bytes"
+            if (( bytes >= MAX_RELEASE_ASSET_BYTES )); then
+              echo "::error::$zip exceeds GitHub's 2 GiB per-release-asset limit."
+              exit 1
+            fi
+
+            sha256sum "$zip" >> SHA256SUMS.txt
+            gh release upload "$RELEASE_TAG" "$zip" --repo "$GITHUB_REPOSITORY"
+            rm -f "$zip"
+            rm -rf work
+          }
+
+          : > SHA256SUMS.txt
+
+          package_variant "CPU-Vulkan" \
+            portable/backends/latest/vulkan-avx backends/latest/vulkan-avx \
+            portable/backends/latest/vulkan-avx2 backends/latest/vulkan-avx2
+
+          package_variant "NVIDIA-Pascal" \
+            portable/backends/stable/cuda-pascal-avx backends/stable/cuda-pascal-avx \
+            portable/backends/latest/cuda-pascal-avx backends/latest/cuda-pascal-avx
+
+          if [[ -d portable/backends/latest/cuda-modern-avx2 ]]; then
+            package_variant "NVIDIA-RTX20-40" \
+              portable/backends/latest/cuda-modern-avx2 backends/latest/cuda-modern-avx2
+          else
+            echo "cuda-modern-avx2 was not produced by build #37; no RTX20-40 asset will be published."
+          fi
+
+          if [[ -d portable/backends/latest/cuda-blackwell-avx2 ]]; then
+            package_variant "NVIDIA-RTX50" \
+              portable/backends/latest/cuda-blackwell-avx2 backends/latest/cuda-blackwell-avx2
+          else
+            echo "cuda-blackwell-avx2 was not produced by build #37; no RTX50 asset will be published."
+          fi
+
+          gh release upload "$RELEASE_TAG" SHA256SUMS.txt --repo "$GITHUB_REPOSITORY"
+
+      - name: Publish release
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release edit "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft=false \
+            --latest
+          echo "Published: https://github.com/$GITHUB_REPOSITORY/releases/tag/$RELEASE_TAG"
