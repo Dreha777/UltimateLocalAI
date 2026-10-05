@@ -145,6 +145,19 @@ public sealed class ChatRepository
         Attachments = x.Attachments.Select(a => new AttachmentInfo
         {
             FileName = a.FileName, FullPath = a.FullPath, SizeBytes = a.SizeBytes, ExtractedText = a.ExtractedText
+        }).ToList(),
+        Sources = x.Sources.Select(s => new RagSourceCitation
+        {
+            Number = s.Number,
+            SourcePath = s.SourcePath,
+            DisplayName = s.DisplayName,
+            Section = s.Section,
+            PageFrom = s.PageFrom,
+            PageTo = s.PageTo,
+            Snippet = s.Snippet,
+            SemanticScore = s.SemanticScore,
+            RerankScore = s.RerankScore,
+            RetrievalMethod = s.RetrievalMethod
         }).ToList()
     };
 }

@@ -145,13 +145,16 @@ public partial class MainWindow : Window
         Messages.Clear();
         foreach (var m in _chatRepo.GetMessages(chat.Id))
         {
-            Messages.Add(new UiMessage
+            var ui = new UiMessage
             {
                 Role = m.Role,
                 Content = m.Content,
                 AttachmentSummary = m.Attachments.Count == 0 ? "" : "📎 " + string.Join(" · ", m.Attachments.Select(a => a.FileName)),
                 CreatedAt = m.CreatedAt
-            });
+            };
+            foreach (var source in m.Sources)
+                ui.Sources.Add(CloneSourceCitation(source));
+            Messages.Add(ui);
         }
         if (!string.IsNullOrWhiteSpace(chat.ModelPath) && File.Exists(chat.ModelPath))
         {
@@ -584,6 +587,8 @@ public partial class MainWindow : Window
             context.AppendLine();
             remainingChars = contextBudgetChars - context.Length;
         }
+        var ragSources = new List<RagSourceCitation>();
+
         if (_config.UseKnowledgeBase && !string.IsNullOrWhiteSpace(prompt) && remainingChars > 1000)
         {
             List<KnowledgeHit> hits = [];
@@ -638,6 +643,20 @@ public partial class MainWindow : Window
                         : hit.Content[..bodyBudget];
 
                     context.Append(header).Append(body).AppendLine();
+
+                    ragSources.Add(new RagSourceCitation
+                    {
+                        Number = sourceNumber,
+                        SourcePath = hit.SourcePath,
+                        DisplayName = name,
+                        Section = hit.Section,
+                        PageFrom = hit.PageFrom,
+                        PageTo = hit.PageTo,
+                        Snippet = body,
+                        SemanticScore = hit.SemanticScore,
+                        RerankScore = hit.RerankScore,
+                        RetrievalMethod = hit.RetrievalMethod
+                    });
                 }
 
                 if (diagnostics is not null)
@@ -671,6 +690,8 @@ public partial class MainWindow : Window
 
         PromptBox.Clear(); PendingAttachments.Clear(); ScrollToBottom();
         var assistantUi = new UiMessage { Role = "assistant", Content = "", CreatedAt = DateTime.Now };
+        foreach (var source in ragSources)
+            assistantUi.Sources.Add(CloneSourceCitation(source));
         Messages.Add(assistantUi);
         ScrollToBottom();
 
@@ -741,7 +762,14 @@ public partial class MainWindow : Window
             sw.Stop();
             if (!string.IsNullOrWhiteSpace(assistantUi.Content))
             {
-                _chatRepo.SaveMessage(new ChatMessage { ChatId = _currentChat.Id, Role = "assistant", Content = assistantUi.Content, CreatedAt = DateTime.Now });
+                _chatRepo.SaveMessage(new ChatMessage
+                {
+                    ChatId = _currentChat.Id,
+                    Role = "assistant",
+                    Content = assistantUi.Content,
+                    CreatedAt = DateTime.Now,
+                    Sources = ragSources.Select(CloneSourceCitation).ToList()
+                });
                 var tokens = await _api.TokenCountAsync(_config.Port, assistantUi.Content);
                 PerfText.Text = $"≈ {tokens / Math.Max(0.01, sw.Elapsed.TotalSeconds):0.00} ток/с · {sw.Elapsed.TotalSeconds:0.0} с";
             }
@@ -1033,6 +1061,20 @@ public partial class MainWindow : Window
     private static string CompactUi(string value, int max) =>
         value.Length <= max ? value : value[..max] + "…";
 
+    private static RagSourceCitation CloneSourceCitation(RagSourceCitation source) => new()
+    {
+        Number = source.Number,
+        SourcePath = source.SourcePath,
+        DisplayName = source.DisplayName,
+        Section = source.Section,
+        PageFrom = source.PageFrom,
+        PageTo = source.PageTo,
+        Snippet = source.Snippet,
+        SemanticScore = source.SemanticScore,
+        RerankScore = source.RerankScore,
+        RetrievalMethod = source.RetrievalMethod
+    };
+
     private void PromptBox_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter && Keyboard.Modifiers != ModifierKeys.Shift)
@@ -1047,6 +1089,34 @@ public partial class MainWindow : Window
     {
         var s = text.Replace("\r", " ").Replace("\n", " ").Trim();
         return s.Length > 42 ? s[..42] + "…" : s;
+    }
+
+    private void ShowSourceFragment_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not RagSourceCitation source)
+            return;
+
+        var win = new SourceViewerWindow(CloneSourceCitation(source)) { Owner = this };
+        win.ShowDialog();
+    }
+
+    private void OpenSource_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not RagSourceCitation source)
+            return;
+
+        try
+        {
+            SourceNavigationService.OpenSource(source);
+            RuntimeStatusText.Text = string.IsNullOrWhiteSpace(source.PageLabel)
+                ? $"Открыт источник: {source.DisplayName}"
+                : $"Открыт источник: {source.DisplayName} · {source.PageLabel}";
+        }
+        catch (Exception ex)
+        {
+            LogService.Warn("Open RAG source failed: " + ex.Message);
+            MessageBox.Show(ex.Message, "Источник недоступен", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void CopyMessage_Click(object sender, RoutedEventArgs e)

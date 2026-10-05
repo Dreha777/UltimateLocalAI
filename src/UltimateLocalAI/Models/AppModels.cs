@@ -79,6 +79,7 @@ public sealed class ChatMessage
     public string ContextText { get; set; } = "";
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public List<AttachmentInfo> Attachments { get; set; } = [];
+    public List<RagSourceCitation> Sources { get; set; } = [];
 }
 
 public sealed class UiMessage : INotifyPropertyChanged
@@ -87,6 +88,7 @@ public sealed class UiMessage : INotifyPropertyChanged
     private string _attachmentSummary = "";
 
     public string Role { get; set; } = "assistant";
+    public ObservableCollection<RagSourceCitation> Sources { get; } = [];
 
     public string Content
     {
@@ -116,6 +118,35 @@ public sealed class UiMessage : INotifyPropertyChanged
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+}
+
+public sealed class RagSourceCitation
+{
+    public int Number { get; set; }
+    public string SourcePath { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public string Section { get; set; } = "";
+    public int? PageFrom { get; set; }
+    public int? PageTo { get; set; }
+    public string Snippet { get; set; } = "";
+    public double SemanticScore { get; set; }
+    public double? RerankScore { get; set; }
+    public string RetrievalMethod { get; set; } = "";
+
+    public string PageLabel => PageFrom.HasValue
+        ? PageTo.HasValue && PageTo != PageFrom ? $"стр. {PageFrom}–{PageTo}" : $"стр. {PageFrom}"
+        : "";
+
+    public string LocationLabel
+    {
+        get
+        {
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(PageLabel)) parts.Add(PageLabel);
+            if (!string.IsNullOrWhiteSpace(Section)) parts.Add(Section);
+            return string.Join(" · ", parts);
+        }
+    }
 }
 
 public sealed class AttachmentInfo
