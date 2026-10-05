@@ -16,6 +16,7 @@ public static class RagChunker
         var result = new List<RagChunkRecord>();
         if (segments.Count == 0) return result;
 
+        var chunkId = nextChunkId;
         targetChars = Math.Clamp(targetChars, 600, 4000);
         overlapChars = Math.Clamp(overlapChars, 0, Math.Min(800, targetChars / 2));
 
@@ -35,7 +36,7 @@ public static class RagChunker
 
             result.Add(new RagChunkRecord
             {
-                ChunkId = nextChunkId++,
+                ChunkId = chunkId++,
                 DocumentId = documentId,
                 ChunkIndex = result.Count,
                 PageFrom = pageFrom,
@@ -96,6 +97,7 @@ public static class RagChunker
         }
 
         Flush();
+        nextChunkId = chunkId;
         return result;
     }
 
