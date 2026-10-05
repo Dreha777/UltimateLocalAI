@@ -32,6 +32,13 @@ public sealed class AppConfig
     public string OcrLanguages { get; set; } = "rus+eng";
     public bool OcrRestorationEnabled { get; set; } = true;
     public double OcrMaxDeskewDegrees { get; set; } = 12.0;
+    public bool DocumentVisionEnabled { get; set; } = true;
+    public string DocumentVisionModelPath { get; set; } = "";
+    public string DocumentVisionMmprojPath { get; set; } = "";
+    public int DocumentVisionPort { get; set; } = 8092;
+    public int DocumentVisionDpi { get; set; } = 220;
+    public bool DocumentVisionUseGpu { get; set; } = false;
+    public bool DocumentVisionAnalyzeAllPages { get; set; } = true;
     public RuntimeSettings Runtime { get; set; } = new();
     public GenerationSettings Generation { get; set; } = new();
 }
@@ -282,9 +289,17 @@ public sealed class KnowledgeDocument
     public int OcrPageCount { get; set; }
     public double OcrAverageConfidence { get; set; }
     public string ImportMode { get; set; } = "";
-    public string ImportSummary => OcrPageCount > 0
-        ? $"{ImportMode} · OCR {OcrPageCount} стр. · {OcrAverageConfidence:P0}"
-        : string.IsNullOrWhiteSpace(ImportMode) ? "Text" : ImportMode;
+    public int VisionPageCount { get; set; }
+    public string ImportSummary
+    {
+        get
+        {
+            var baseText = OcrPageCount > 0
+                ? $"{ImportMode} · OCR {OcrPageCount} стр. · {OcrAverageConfidence:P0}"
+                : string.IsNullOrWhiteSpace(ImportMode) ? "Text" : ImportMode;
+            return VisionPageCount > 0 ? $"{baseText} · Vision {VisionPageCount} стр." : baseText;
+        }
+    }
 }
 
 public sealed class KnowledgeHit
@@ -348,6 +363,8 @@ public sealed class RagIndexedDocument
     public int OcrPageCount { get; set; }
     public double OcrAverageConfidence { get; set; }
     public string ImportMode { get; set; } = "";
+    public int VisionPageCount { get; set; }
+    public string VisionModelName { get; set; } = "";
 }
 
 public sealed class RagIndexManifest
@@ -413,6 +430,9 @@ public sealed class PdfPageScanInfo
         : UsedRestoration
             ? $"{RestorationVariant} · {DeskewDegrees:+0.0;-0.0;0.0}°"
             : "Original";
+    public bool UsedVision { get; set; }
+    public string VisionStatus { get; set; } = "";
+    public string VisionContent { get; set; } = "";
 }
 
 public sealed class PdfScanReport
@@ -423,6 +443,8 @@ public sealed class PdfScanReport
     public int OcrCandidatePageCount { get; set; }
     public int OcrPageCount { get; set; }
     public double OcrAverageConfidence { get; set; }
+    public int VisionPageCount { get; set; }
+    public string VisionModelName { get; set; } = "";
     public string DocumentMode { get; set; } = "Text PDF";
     public List<PdfPageScanInfo> Pages { get; set; } = [];
 }
@@ -431,4 +453,14 @@ public sealed class RagExtractionResult
 {
     public List<RagSourceSegment> Segments { get; set; } = [];
     public PdfScanReport? PdfReport { get; set; }
+}
+
+
+public sealed class DocumentVisionAnalysis
+{
+    public int PageNumber { get; set; }
+    public string Content { get; set; } = "";
+    public bool HasVisualContent { get; set; }
+    public string ModelName { get; set; } = "";
+    public string Status { get; set; } = "";
 }
