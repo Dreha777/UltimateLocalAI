@@ -22,6 +22,8 @@ public partial class PdfScannerWindow : Window
         DpiBox.Text = _config.OcrDpi.ToString();
         LanguagesBox.Text = _config.OcrLanguages;
         ConfidenceBox.Text = _config.OcrMinConfidence.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+        RestorationEnabledBox.IsChecked = _config.OcrRestorationEnabled;
+        MaxDeskewBox.Text = _config.OcrMaxDeskewDegrees.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
 
         Closed += (_, _) => _cts?.Cancel();
 
@@ -84,9 +86,10 @@ public partial class PdfScannerWindow : Window
                 $"фактически OCR {report.OcrPageCount}" +
                 (report.OcrPageCount > 0 ? $" · средняя confidence {report.OcrAverageConfidence:P0}" : "");
 
+            var restored = report.Pages.Count(x => x.UsedRestoration);
             StatusText.Text = report.Pages.Any(x => x.UsedOcr && x.OcrConfidence < _config.OcrMinConfidence)
-                ? "Есть страницы с низкой OCR confidence. Их стоит визуально проверить; улучшение старых сканов будет в Stage 7G-5."
-                : "Анализ завершён.";
+                ? $"Анализ завершён · восстановлено страниц: {restored}. Есть страницы с низкой OCR confidence — проверьте их через «До / после»."
+                : $"Анализ завершён · восстановлено страниц: {restored}.";
         }
         catch (OperationCanceledException)
         {
@@ -112,7 +115,27 @@ public partial class PdfScannerWindow : Window
         _config.OcrDpi = ParseInt(DpiBox.Text, 300, 150, 450);
         _config.OcrLanguages = string.IsNullOrWhiteSpace(LanguagesBox.Text) ? "rus+eng" : LanguagesBox.Text.Trim();
         _config.OcrMinConfidence = ParseDouble(ConfidenceBox.Text, 0.45, 0, 1);
+        _config.OcrRestorationEnabled = RestorationEnabledBox.IsChecked == true;
+        _config.OcrMaxDeskewDegrees = ParseDouble(MaxDeskewBox.Text, 12.0, 0, 20);
         _configService.Save(_config);
+    }
+
+    private void PreviewRestoration_Click(object sender, RoutedEventArgs e)
+    {
+        if (PagesList.SelectedItem is not PdfPageScanInfo page || !File.Exists(PdfPathBox.Text))
+        {
+            MessageBox.Show(
+                "Сначала выберите проанализированную страницу.",
+                "Восстановление скана", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        SaveSettings();
+        var win = new PdfRestorationPreviewWindow(PdfPathBox.Text, page.PageNumber, _config)
+        {
+            Owner = this
+        };
+        win.ShowDialog();
     }
 
     private void OpenPage_Click(object sender, RoutedEventArgs e)
