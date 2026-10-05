@@ -195,6 +195,8 @@ public sealed class RagVectorIndexService
         var extraction = await _extractor.ExtractAsync(path, config, progress, vision, ct);
         var segments = extraction.Segments;
         var pdfReport = extraction.PdfReport;
+        if (pdfReport?.VisionErrorCount > 0)
+            extractionFingerprint += $"|vision-errors:{pdfReport.VisionErrorCount}";
 
         if (segments.Count == 0)
             throw new InvalidDataException($"{file.Name}: не удалось извлечь текст.");
