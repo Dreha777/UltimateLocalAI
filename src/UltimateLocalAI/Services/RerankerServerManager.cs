@@ -47,7 +47,7 @@ public sealed class RerankerServerManager : IAsyncDisposable
         Add(psi, "-ngl", "0");
         Add(psi, "--device", "none");
 
-        LogService.Info($"RERANK-SERVER-START model="{modelPath}" port={config.RerankerPort}");
+        LogService.Info($"RERANK-SERVER-START model=\"{modelPath}\" port={config.RerankerPort}");
 
         var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
         _process = process;
