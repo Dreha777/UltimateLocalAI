@@ -1098,6 +1098,34 @@ public partial class MainWindow : Window
         return s.Length > 42 ? s[..42] + "…" : s;
     }
 
+    private void ShowSourceFragment_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not RagSourceCitation source)
+            return;
+
+        var win = new SourceViewerWindow(CloneSourceCitation(source)) { Owner = this };
+        win.ShowDialog();
+    }
+
+    private void OpenSource_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not RagSourceCitation source)
+            return;
+
+        try
+        {
+            SourceNavigationService.OpenSource(source);
+            RuntimeStatusText.Text = string.IsNullOrWhiteSpace(source.PageLabel)
+                ? $"Открыт источник: {source.DisplayName}"
+                : $"Открыт источник: {source.DisplayName} · {source.PageLabel}";
+        }
+        catch (Exception ex)
+        {
+            LogService.Warn("Open RAG source failed: " + ex.Message);
+            MessageBox.Show(ex.Message, "Источник недоступен", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     private void CopyMessage_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is not UiMessage message || string.IsNullOrEmpty(message.Content))
