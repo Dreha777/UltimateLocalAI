@@ -18,6 +18,8 @@ public sealed class AppConfig
     public List<string> ModelFolders { get; set; } = [];
     public string EmbeddingModelPath { get; set; } = "";
     public int EmbeddingPort { get; set; } = 8090;
+    public string EmbeddingDocumentPrefix { get; set; } = "";
+    public string EmbeddingQueryPrefix { get; set; } = "";
     public RuntimeSettings Runtime { get; set; } = new();
     public GenerationSettings Generation { get; set; } = new();
 }
@@ -285,6 +287,7 @@ public sealed class RagIndexManifest
     public string EmbeddingModelPath { get; set; } = "";
     public string EmbeddingModelFingerprint { get; set; } = "";
     public string EmbeddingModelName { get; set; } = "";
+    public string EmbeddingDocumentPrefix { get; set; } = "";
     public int VectorDimensions { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
