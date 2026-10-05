@@ -15,6 +15,7 @@ public sealed class AutoRuntimeConfigurator
     public AutoRuntimeProfile Create(HardwareInfo hw, BackendChoice backend, RuntimeSettings current, string modelPath, GgufModelMetadata? metadata = null)
     {
         var warnings = new List<string>();
+        var autoProfile = NormalizeProfile(current.AutoProfile);
         var logical = Math.Max(1, hw.LogicalProcessors);
         var reservedThreads = logical >= 4 ? Math.Max(1, logical / 4) : 0;
         var workerThreads = Math.Max(1, logical - reservedThreads);
@@ -34,22 +35,34 @@ public sealed class AutoRuntimeConfigurator
         }
         catch { }
 
-        // Respect a larger user preference when it is realistic, but never silently
-        // collapse normal Auto operation to 1024 tokens. 4096 is the baseline quality target.
+        // Auto profile is an explicit user preference. "Качество" is the default
+        // and keeps the Stage 7E quality-first policy. "Баланс" avoids unnecessary
+        // memory expansion; "Экономия" targets weak PCs without ever selecting q4 KV.
         var requestedContext = current.ContextSize > 0 ? current.ContextSize : 4096;
-        requestedContext = Math.Clamp(requestedContext, 2_048, 16_384);
-        var context = Math.Max(4_096, requestedContext);
-
-        // When the user left the normal 4096 default and the machine clearly has headroom,
-        // quality-first Auto may raise the context to 8192 by itself.
         var nativeContext = metadata?.NativeContextSize is long native && native > 0
             ? Math.Min(native, 1_048_576L)
             : 0L;
-        var ampleSystemHeadroom = totalRamMb >= 32_000 &&
-                                  availableRamMb >= 16_000 &&
-                                  (modelSizeMb <= 0 || modelSizeMb < usableRamMb * 0.55);
-        if (requestedContext <= 4_096 && ampleSystemHeadroom && (nativeContext == 0 || nativeContext >= 8_192))
-            context = 8_192;
+
+        int context;
+        if (autoProfile == "Экономия")
+        {
+            context = Math.Clamp(requestedContext, 2_048, 4_096);
+        }
+        else if (autoProfile == "Баланс")
+        {
+            context = Math.Clamp(Math.Max(4_096, requestedContext), 4_096, 8_192);
+        }
+        else
+        {
+            requestedContext = Math.Clamp(requestedContext, 2_048, 16_384);
+            context = Math.Max(4_096, requestedContext);
+
+            var ampleSystemHeadroom = totalRamMb >= 32_000 &&
+                                      availableRamMb >= 16_000 &&
+                                      (modelSizeMb <= 0 || modelSizeMb < usableRamMb * 0.55);
+            if (requestedContext <= 4_096 && ampleSystemHeadroom && (nativeContext == 0 || nativeContext >= 8_192))
+                context = 8_192;
+        }
 
         if (nativeContext > 0 && context > nativeContext)
         {
@@ -57,7 +70,7 @@ public sealed class AutoRuntimeConfigurator
             warnings.Add($"Контекст ограничен родным пределом модели: {nativeContext}.");
         }
 
-        if (context > 8_192 && totalRamMb > 0 && totalRamMb < 32_000)
+        if (autoProfile != "Экономия" && context > 8_192 && totalRamMb > 0 && totalRamMb < 32_000)
         {
             context = 8_192;
             warnings.Add("Запрошенный контекст ограничен 8192: для большего контекста недостаточно системной RAM.");
@@ -90,6 +103,17 @@ public sealed class AutoRuntimeConfigurator
             : 512;
         var ubatch = Math.Max(64, batch / 2);
 
+        if (autoProfile == "Экономия")
+        {
+            batch = Math.Min(batch, 128);
+            ubatch = Math.Min(ubatch, 64);
+        }
+        else if (autoProfile == "Баланс")
+        {
+            batch = Math.Min(batch, 256);
+            ubatch = Math.Min(ubatch, 128);
+        }
+
         if (availableRamMb > 0 && availableRamMb < 6_144)
         {
             batch = Math.Min(batch, 128);
@@ -118,7 +142,7 @@ public sealed class AutoRuntimeConfigurator
                                 modelSizeMb <= hw.GpuVramMb * 0.62;
         var cpuHasF16Headroom = !backend.UsesGpu && ramHeadroomMb >= 6_144;
         var veryLargeSystem = totalRamMb >= 64_000 && availableRamMb >= 16_384;
-        var useF16Kv = gpuHasF16Headroom || cpuHasF16Headroom || veryLargeSystem;
+        var useF16Kv = autoProfile == "Качество" && (gpuHasF16Headroom || cpuHasF16Headroom || veryLargeSystem);
         var cacheType = useF16Kv ? "f16" : "q8_0";
 
         if (metadata?.IsAggressivelyQuantized == true)
@@ -138,11 +162,12 @@ public sealed class AutoRuntimeConfigurator
             LoadMode = "auto",
             ReasoningMode = current.ReasoningMode,
             ReasoningEffort = current.ReasoningEffort,
-            Priority = current.Priority
+            Priority = current.Priority,
+            AutoProfile = autoProfile
         };
 
         var quant = string.IsNullOrWhiteSpace(metadata?.Quantization) ? "?" : metadata.Quantization;
-        var reason = $"Auto Quality: {logical} лог. CPU -> {workerThreads} рабочих потоков; " +
+        var reason = $"Auto {autoProfile}: {logical} лог. CPU -> {workerThreads} рабочих потоков; " +
                      $"RAM {totalRamMb / 1024.0:0.#} ГБ, свободно {availableRamMb / 1024.0:0.#} ГБ; модель {modelSizeMb / 1024.0:0.00} ГБ; " +
                      $"GGUF {quant}; context {context}; KV {cacheType}; batch {batch}/{ubatch}; GPU layers {(backend.UsesGpu ? "llama.cpp auto-fit" : "off")}.";
 
@@ -155,12 +180,20 @@ public sealed class AutoRuntimeConfigurator
         };
     }
 
+    private static string NormalizeProfile(string? value) =>
+        value?.Trim() switch
+        {
+            "Баланс" => "Баланс",
+            "Экономия" => "Экономия",
+            _ => "Качество"
+        };
+
     public static string ToLogLine(HardwareInfo hw, BackendChoice backend, AutoRuntimeProfile profile)
     {
         var r = profile.Runtime;
         var warnings = profile.Warnings.Count == 0 ? "-" : string.Join(" | ", profile.Warnings);
         return "AUTO-RUNTIME " +
-               $"policy=quality-first cpu=\"{hw.CpuName}\" logical={hw.LogicalProcessors} avx={hw.Avx} avx2={hw.Avx2} " +
+               $"profile=\"{r.AutoProfile}\" cpu=\"{hw.CpuName}\" logical={hw.LogicalProcessors} avx={hw.Avx} avx2={hw.Avx2} " +
                $"ram_mb={hw.TotalRamMb} ram_available_mb={hw.AvailableRamMb} gpu=\"{hw.GpuName}\" gpu_vendor=\"{hw.GpuVendor}\" vram_mb={hw.GpuVramMb} cc=\"{hw.ComputeCapability}\" " +
                $"backend=\"{backend.Name}\" model_mb={profile.ModelSizeMb} context={r.ContextSize} " +
                $"threads={r.Threads} threads_batch={r.ThreadsBatch} batch={r.BatchSize} ubatch={r.UBatchSize} " +
