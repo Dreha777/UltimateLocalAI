@@ -408,6 +408,11 @@ public sealed class PdfPageScanInfo
     public string RestorationVariant { get; set; } = "Original";
     public double DeskewDegrees { get; set; }
     public double RestorationScore { get; set; }
+    public string RestorationLabel => !UsedOcr
+        ? "—"
+        : UsedRestoration
+            ? $"{RestorationVariant} · {DeskewDegrees:+0.0;-0.0;0.0}°"
+            : "Original";
 }
 
 public sealed class PdfScanReport
