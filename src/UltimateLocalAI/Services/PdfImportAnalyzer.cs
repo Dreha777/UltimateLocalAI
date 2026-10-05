@@ -49,9 +49,8 @@ public sealed class PdfImportAnalyzer
         var nonSpace = normalized.Count(ch => !char.IsWhiteSpace(ch));
         var useful = normalized.Count(IsUsefulTextChar);
         var letters = normalized.Count(char.IsLetter);
-        var replacement = normalized.Count(ch => ch == '�');
-        var control = normalized.Count(ch => char.IsControl(ch) && ch is not '
-' and not '	');
+        var replacement = normalized.Count(ch => ch == '\uFFFD');
+        var control = normalized.Count(ch => char.IsControl(ch) && ch is not '\n' and not '\t');
         var usefulRatio = nonSpace == 0 ? 0 : useful / (double)nonSpace;
 
         string mode;
@@ -92,15 +91,10 @@ public sealed class PdfImportAnalyzer
     public static string Normalize(string? text)
     {
         if (string.IsNullOrWhiteSpace(text)) return "";
-        var value = text.Replace("
-", "
-").Replace('', '
-');
-        value = Regex.Replace(value, @"[ 	]+", " ");
-        value = Regex.Replace(value, @"
-{3,}", "
 
-");
+        var value = text.Replace("\r\n", "\n").Replace('\r', '\n');
+        value = Regex.Replace(value, @"[ \t]+", " ");
+        value = Regex.Replace(value, @"\n{3,}", "\n\n");
         return value.Trim();
     }
 
@@ -112,6 +106,6 @@ public sealed class PdfImportAnalyzer
         return ch is '.' or ',' or ';' or ':' or '!' or '?' or '-' or '—' or '–' or
                '(' or ')' or '[' or ']' or '{' or '}' or '/' or '\\' or '+' or '=' or
                '%' or '№' or '§' or '°' or 'µ' or 'μ' or 'λ' or 'Δ' or 'δ' or 'π' or
-               '<' or '>' or ''' or '"' or '«' or '»';
+               '<' or '>' or '\'' or '"' or '«' or '»';
     }
 }
