@@ -83,7 +83,7 @@ public sealed class RagVectorIndexService
         {
             AppPaths.EnsureDirectories();
             var manifest = GetManifest();
-            var fingerprint = BuildEmbeddingFingerprint(config.EmbeddingModelPath, config.EmbeddingDocumentPrefix);
+            var fingerprint = BuildEmbeddingFingerprint(config.EmbeddingModelPath, config.EmbeddingDocumentPrefix, config.EmbeddingPooling);
             ValidateEmbeddingSpace(manifest, config, fingerprint);
 
             var backend = _backendSelector.CpuFallback(hardware, config);
@@ -244,6 +244,7 @@ public sealed class RagVectorIndexService
         manifest.EmbeddingModelFingerprint = fingerprint;
         manifest.EmbeddingModelName = Path.GetFileName(config.EmbeddingModelPath);
         manifest.EmbeddingDocumentPrefix = config.EmbeddingDocumentPrefix ?? "";
+        manifest.EmbeddingPooling = config.EmbeddingPooling ?? "Auto";
         manifest.UpdatedAt = DateTime.Now;
 
         var indexed = new RagIndexedDocument
@@ -302,6 +303,7 @@ public sealed class RagVectorIndexService
                 manifest.EmbeddingModelFingerprint = "";
                 manifest.EmbeddingModelName = "";
                 manifest.EmbeddingDocumentPrefix = "";
+                manifest.EmbeddingPooling = "Auto";
             }
 
             SaveManifest(manifest);
@@ -341,7 +343,7 @@ public sealed class RagVectorIndexService
         }
     }
 
-    private static string BuildEmbeddingFingerprint(string modelPath, string? documentPrefix)
+    private static string BuildEmbeddingFingerprint(string modelPath, string? documentPrefix, string? pooling)
     {
         var file = new FileInfo(modelPath);
         var canonical = Path.GetFullPath(modelPath);
@@ -349,7 +351,8 @@ public sealed class RagVectorIndexService
             canonical.ToUpperInvariant(),
             file.Length,
             file.LastWriteTimeUtc.Ticks,
-            documentPrefix ?? "");
+            documentPrefix ?? "",
+            pooling?.Trim().ToLowerInvariant() ?? "auto");
     }
 
     private static async Task<string> ComputeSha256Async(string path, CancellationToken ct)
