@@ -40,6 +40,7 @@ public sealed class DocumentVisionServerManager : IAsyncDisposable
         Add(psi, "-b", "256");
         Add(psi, "-ub", "128");
         Add(psi, "--offline");
+        Add(psi, "--media-path", AppPaths.TempDir);
         Add(psi, "--no-webui");
         Add(psi, "--no-warmup");
 
