@@ -116,11 +116,8 @@ public sealed class LlamaApiClient
             {
                 foreach (var property in caps.EnumerateObject())
                 {
-                    if (property.Value.ValueKind == JsonValueKind.True ||
-                        (property.Value.ValueKind == JsonValueKind.False && property.Value.GetBoolean()))
-                    {
+                    if (property.Value.ValueKind == JsonValueKind.True)
                         result.ChatTemplateCapabilities.Add(property.Name);
-                    }
                 }
             }
 
