@@ -280,6 +280,9 @@ public sealed class KnowledgeDocument
     public int OcrPageCount { get; set; }
     public double OcrAverageConfidence { get; set; }
     public string ImportMode { get; set; } = "";
+    public string ImportSummary => OcrPageCount > 0
+        ? $"{ImportMode} · OCR {OcrPageCount} стр. · {OcrAverageConfidence:P0}"
+        : string.IsNullOrWhiteSpace(ImportMode) ? "Text" : ImportMode;
 }
 
 public sealed class KnowledgeHit
