@@ -12,7 +12,7 @@ public sealed class AutoRuntimeProfile
 
 public sealed class AutoRuntimeConfigurator
 {
-    public AutoRuntimeProfile Create(HardwareInfo hw, BackendChoice backend, RuntimeSettings current, string modelPath)
+    public AutoRuntimeProfile Create(HardwareInfo hw, BackendChoice backend, RuntimeSettings current, string modelPath, GgufModelMetadata? metadata = null)
     {
         var warnings = new List<string>();
         var logical = Math.Max(1, hw.LogicalProcessors);
@@ -35,10 +35,27 @@ public sealed class AutoRuntimeConfigurator
         catch { }
 
         // Respect a larger user preference when it is realistic, but never silently
-        // collapse normal Auto operation to 1024 tokens. 4096 is the quality target.
+        // collapse normal Auto operation to 1024 tokens. 4096 is the baseline quality target.
         var requestedContext = current.ContextSize > 0 ? current.ContextSize : 4096;
         requestedContext = Math.Clamp(requestedContext, 2_048, 16_384);
         var context = Math.Max(4_096, requestedContext);
+
+        // When the user left the normal 4096 default and the machine clearly has headroom,
+        // quality-first Auto may raise the context to 8192 by itself.
+        var nativeContext = metadata?.NativeContextSize is long native && native > 0
+            ? Math.Min(native, 1_048_576L)
+            : 0L;
+        var ampleSystemHeadroom = totalRamMb >= 32_000 &&
+                                  availableRamMb >= 16_000 &&
+                                  (modelSizeMb <= 0 || modelSizeMb < usableRamMb * 0.55);
+        if (requestedContext <= 4_096 && ampleSystemHeadroom && (nativeContext == 0 || nativeContext >= 8_192))
+            context = 8_192;
+
+        if (nativeContext > 0 && context > nativeContext)
+        {
+            context = (int)Math.Max(512L, nativeContext);
+            warnings.Add($"Контекст ограничен родным пределом модели: {nativeContext}.");
+        }
 
         if (context > 8_192 && totalRamMb > 0 && totalRamMb < 32_000)
         {
@@ -104,6 +121,9 @@ public sealed class AutoRuntimeConfigurator
         var useF16Kv = gpuHasF16Headroom || cpuHasF16Headroom || veryLargeSystem;
         var cacheType = useF16Kv ? "f16" : "q8_0";
 
+        if (metadata?.IsAggressivelyQuantized == true)
+            warnings.Add($"GGUF {metadata.Quantization}: сильная квантовка может ограничивать качество независимо от runtime-настроек.");
+
         var runtime = new RuntimeSettings
         {
             ContextSize = context,
@@ -121,9 +141,10 @@ public sealed class AutoRuntimeConfigurator
             Priority = current.Priority
         };
 
+        var quant = string.IsNullOrWhiteSpace(metadata?.Quantization) ? "?" : metadata.Quantization;
         var reason = $"Auto Quality: {logical} лог. CPU -> {workerThreads} рабочих потоков; " +
                      $"RAM {totalRamMb / 1024.0:0.#} ГБ, свободно {availableRamMb / 1024.0:0.#} ГБ; модель {modelSizeMb / 1024.0:0.00} ГБ; " +
-                     $"context {context}; KV {cacheType}; batch {batch}/{ubatch}; GPU layers {(backend.UsesGpu ? "llama.cpp auto-fit" : "off")}.";
+                     $"GGUF {quant}; context {context}; KV {cacheType}; batch {batch}/{ubatch}; GPU layers {(backend.UsesGpu ? "llama.cpp auto-fit" : "off")}.";
 
         return new AutoRuntimeProfile
         {

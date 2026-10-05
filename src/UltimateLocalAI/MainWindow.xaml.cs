@@ -35,6 +35,7 @@ public partial class MainWindow : Window
     private bool _modelReady;
     private int _activeContextSize = 4096;
     private ModelServerProperties? _modelProperties;
+    private GgufModelMetadata _modelFileMetadata = new();
     private string _modelDiagnosticSummary = "";
     private string _autoRuntimeWarning = "";
 
@@ -274,6 +275,7 @@ public partial class MainWindow : Window
             RefreshModelHeader();
             PerfText.Text = "";
             _modelProperties = null;
+            _modelFileMetadata = new GgufModelMetadata();
             _modelDiagnosticSummary = "";
             _autoRuntimeWarning = "";
         }
@@ -331,10 +333,14 @@ public partial class MainWindow : Window
         PerfText.Text = "";
         BackendChoice? activeBackend = null;
         _modelProperties = null;
+        _modelFileMetadata = new GgufModelMetadata();
         _modelDiagnosticSummary = "";
         _autoRuntimeWarning = "";
         try
         {
+            _modelFileMetadata = GgufMetadataReader.Read(_config.ModelPath);
+            LogGgufFileMetadata(_modelFileMetadata);
+
             var backend = _backendSelector.Select(_hardware, _config);
             activeBackend = backend;
             var launchConfig = CreateLaunchConfig(backend);
@@ -418,7 +424,7 @@ public partial class MainWindow : Window
         }
 
         HardwareDetector.RefreshMemory(_hardware);
-        var profile = _autoRuntimeConfigurator.Create(_hardware, backend, _config.Runtime, _config.ModelPath);
+        var profile = _autoRuntimeConfigurator.Create(_hardware, backend, _config.Runtime, _config.ModelPath, _modelFileMetadata);
         _activeContextSize = profile.Runtime.ContextSize;
         _autoRuntimeWarning = profile.Warnings.Count == 0 ? "" : string.Join(" ", profile.Warnings);
         LogService.Info(AutoRuntimeConfigurator.ToLogLine(_hardware, backend, profile));
@@ -643,6 +649,55 @@ public partial class MainWindow : Window
         if (!string.Equals(_config.BackendMode, "Auto", StringComparison.OrdinalIgnoreCase))
             return result;
 
+        // Respect explicit user tuning. GGUF-recommended samplers are applied only
+        // while the corresponding setting is still at the program default.
+        var samplingChanges = new List<string>();
+        if (_modelFileMetadata.IsValid)
+        {
+            if (Nearly(source.Temperature, 0.7) &&
+                _modelFileMetadata.RecommendedTemperature is double metaTemp &&
+                metaTemp is >= 0 and <= 2)
+            {
+                result.Temperature = metaTemp;
+                samplingChanges.Add($"temp {source.Temperature:0.###}->{result.Temperature:0.###}");
+            }
+
+            if (Nearly(source.TopP, 0.95) &&
+                _modelFileMetadata.RecommendedTopP is double metaTopP &&
+                metaTopP is >= 0 and <= 1)
+            {
+                result.TopP = metaTopP;
+                samplingChanges.Add($"top_p {source.TopP:0.###}->{result.TopP:0.###}");
+            }
+
+            if (source.TopK == 40 &&
+                _modelFileMetadata.RecommendedTopK is int metaTopK &&
+                metaTopK is >= 0 and <= 1000)
+            {
+                result.TopK = metaTopK;
+                samplingChanges.Add($"top_k {source.TopK}->{result.TopK}");
+            }
+
+            if (Nearly(source.MinP, 0.05) &&
+                _modelFileMetadata.RecommendedMinP is double metaMinP &&
+                metaMinP is >= 0 and <= 1)
+            {
+                result.MinP = metaMinP;
+                samplingChanges.Add($"min_p {source.MinP:0.###}->{result.MinP:0.###}");
+            }
+
+            if (Nearly(source.RepeatPenalty, 1.05) &&
+                _modelFileMetadata.RecommendedRepeatPenalty is double metaRepeat &&
+                metaRepeat is >= 0.5 and <= 2)
+            {
+                result.RepeatPenalty = metaRepeat;
+                samplingChanges.Add($"repeat {source.RepeatPenalty:0.###}->{result.RepeatPenalty:0.###}");
+            }
+        }
+
+        if (samplingChanges.Count > 0)
+            LogService.Info("QUALITY-SAMPLING GGUF recommendations: " + string.Join(", ", samplingChanges));
+
         var recommended = _activeContextSize >= 8_192 ? 4_096
             : _activeContextSize >= 4_096 ? 2_048
             : Math.Max(768, _activeContextSize / 2);
@@ -742,23 +797,47 @@ public partial class MainWindow : Window
 
     private string BuildModelDiagnosticSummary(ModelServerProperties? properties)
     {
-        if (properties is null)
-            return "свойства GGUF недоступны";
+        if (properties is null && !_modelFileMetadata.IsValid)
+            return "свойства модели недоступны";
 
         var parts = new List<string>();
-        if (!string.IsNullOrWhiteSpace(properties.ModelFtype))
+        if (!string.IsNullOrWhiteSpace(_modelFileMetadata.Quantization))
+            parts.Add("GGUF " + _modelFileMetadata.Quantization);
+        else if (!string.IsNullOrWhiteSpace(properties?.ModelFtype))
             parts.Add("GGUF " + CompactUi(properties.ModelFtype, 36));
-        if (properties.ContextSize > 0)
+
+        if (properties?.ContextSize > 0)
             parts.Add("ctx " + properties.ContextSize);
-        parts.Add(properties.HasChatTemplate ? "chat-template ✓" : "chat-template ?");
-        if (properties.SupportsReasoning)
-            parts.Add("reasoning ✓");
+
+        if (properties is not null)
+        {
+            parts.Add(properties.HasChatTemplate ? "chat-template ✓" : "chat-template ?");
+            if (properties.SupportsReasoning)
+                parts.Add("reasoning ✓");
+        }
 
         var quant = QuantizationQualityLabel(properties);
         if (!string.IsNullOrWhiteSpace(quant))
             parts.Add(quant);
 
         return string.Join(" · ", parts);
+    }
+
+    private void LogGgufFileMetadata(GgufModelMetadata metadata)
+    {
+        if (!metadata.IsValid)
+        {
+            LogService.Warn("GGUF-META unavailable");
+            return;
+        }
+
+        LogService.Info(
+            $"GGUF-META version={metadata.Version} name=\"{metadata.Name}\" arch=\"{metadata.Architecture}\" " +
+            $"size=\"{metadata.SizeLabel}\" ftype={metadata.FileTypeCode?.ToString() ?? "-"} quant=\"{metadata.Quantization}\" " +
+            $"native_ctx={metadata.NativeContextSize?.ToString() ?? "-"} recommended_sampling={metadata.HasRecommendedSampling}");
+
+        if (metadata.IsAggressivelyQuantized)
+            LogService.Warn($"MODEL-QUALITY GGUF {metadata.Quantization}: сильная квантовка может ограничивать точность ответа.");
     }
 
     private void LogModelDiagnostics(ModelServerProperties? properties)
@@ -783,17 +862,21 @@ public partial class MainWindow : Window
             LogService.Warn("MODEL-QUALITY chat template отсутствует в /props; ответы chat-модели могут быть хуже ожидаемых.");
     }
 
-    private string QuantizationQualityLabel(ModelServerProperties properties)
+    private string QuantizationQualityLabel(ModelServerProperties? properties)
     {
-        var source = ((properties.ModelFtype ?? "") + " " + Path.GetFileName(_config.ModelPath)).ToUpperInvariant();
+        var source = !string.IsNullOrWhiteSpace(_modelFileMetadata.Quantization)
+            ? _modelFileMetadata.Quantization.ToUpperInvariant()
+            : ((properties?.ModelFtype ?? "") + " " + Path.GetFileName(_config.ModelPath)).ToUpperInvariant();
 
-        if (source.Contains("IQ1") || source.Contains("IQ2") ||
-            source.Contains("Q2_") || source.Contains("Q2-") ||
+        if (source.Contains("IQ1") || source.Contains("IQ2") || source.Contains("IQ3") ||
+            source.Contains("TQ1") || source.Contains("TQ2") ||
+            source.Contains("Q1_") || source.Contains("Q2_") || source.Contains("Q2-") ||
             source.Contains("Q3_") || source.Contains("Q3-"))
             return "⚠ низкая точность квантования";
 
-        if (source.Contains("Q4_") || source.Contains("Q4-"))
-            return "Q4: баланс качества/памяти";
+        if (source.Contains("Q4_") || source.Contains("Q4-") ||
+            source.Contains("IQ4") || source.Contains("MXFP4") || source.Contains("NVFP4"))
+            return "Q4-класс: баланс качества/памяти";
 
         if (source.Contains("Q5_") || source.Contains("Q5-") ||
             source.Contains("Q6_") || source.Contains("Q6-") ||
@@ -803,6 +886,8 @@ public partial class MainWindow : Window
 
         return "";
     }
+
+    private static bool Nearly(double a, double b) => Math.Abs(a - b) < 0.000001;
 
     private static string CompactUi(string value, int max) =>
         value.Length <= max ? value : value[..max] + "…";
