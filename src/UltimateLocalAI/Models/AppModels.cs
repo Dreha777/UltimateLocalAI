@@ -303,6 +303,8 @@ public sealed class RagSourceSegment
     public int? PageNumber { get; set; }
     public string Section { get; set; } = "";
     public string Content { get; set; } = "";
+    public string ExtractionMode { get; set; } = "Text";
+    public double OcrConfidence { get; set; }
 }
 
 public sealed class RagChunkRecord
@@ -315,6 +317,8 @@ public sealed class RagChunkRecord
     public string Section { get; set; } = "";
     public string SourcePath { get; set; } = "";
     public string Content { get; set; } = "";
+    public string ExtractionMode { get; set; } = "Text";
+    public double OcrConfidence { get; set; }
     public int VectorIndex { get; set; }
 }
 
