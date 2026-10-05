@@ -53,7 +53,10 @@ public sealed class RagVectorIndexService
                 PageCount = x.PageCount,
                 ChunkCount = x.ChunkCount,
                 IndexStatus = "Vector RAG",
-                EmbeddingModelName = manifest.EmbeddingModelName
+                EmbeddingModelName = manifest.EmbeddingModelName,
+                OcrPageCount = x.OcrPageCount,
+                OcrAverageConfidence = x.OcrAverageConfidence,
+                ImportMode = x.ImportMode
             })
             .ToList();
     }
@@ -124,13 +127,15 @@ public sealed class RagVectorIndexService
     {
         var file = new FileInfo(path);
         var sha256 = await ComputeSha256Async(path, ct);
+        var extractionFingerprint = BuildExtractionFingerprint(path, config);
         var existing = manifest.Documents.FirstOrDefault(x =>
             string.Equals(x.SourcePath, path, StringComparison.OrdinalIgnoreCase));
 
         if (existing is not null &&
             existing.SourceSizeBytes == file.Length &&
             existing.SourceLastWriteUtc == file.LastWriteTimeUtc &&
-            string.Equals(existing.SourceSha256, sha256, StringComparison.OrdinalIgnoreCase))
+            string.Equals(existing.SourceSha256, sha256, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(existing.ExtractionFingerprint, extractionFingerprint, StringComparison.Ordinal))
         {
             progress?.Report(new RagIndexProgress
             {
@@ -152,17 +157,18 @@ public sealed class RagVectorIndexService
             Message = "Извлечение структуры документа…"
         });
 
-        var segments = await _extractor.ExtractAsync(path, ct);
+        var extraction = await _extractor.ExtractAsync(path, config, progress, ct);
+        var segments = extraction.Segments;
+        var pdfReport = extraction.PdfReport;
+
         if (segments.Count == 0)
             throw new InvalidDataException($"{file.Name}: не удалось извлечь текст.");
 
         var usefulChars = segments.Sum(x => x.Content.Count(ch => !char.IsWhiteSpace(ch)));
-        if (usefulChars < 80 ||
-            (segments.Count == 1 && segments[0].Content.Contains("потребуется OCR", StringComparison.OrdinalIgnoreCase)))
+        if (usefulChars < 80)
         {
             throw new InvalidDataException(
-                $"{file.Name}: текстовый слой отсутствует или слишком слабый. " +
-                "Этот документ будет обрабатываться OCR-конвейером на следующих стадиях 7G.");
+                $"{file.Name}: после анализа/OCR извлечено слишком мало текста для надёжного RAG-индекса.");
         }
 
         var documentId = existing?.Id ?? manifest.NextDocumentId++;
@@ -255,8 +261,13 @@ public sealed class RagVectorIndexService
             SourceSizeBytes = file.Length,
             SourceLastWriteUtc = file.LastWriteTimeUtc,
             SourceSha256 = sha256,
-            PageCount = segments.Where(x => x.PageNumber.HasValue).Select(x => x.PageNumber!.Value).Distinct().Count(),
+            ExtractionFingerprint = extractionFingerprint,
+            PageCount = pdfReport?.PageCount ??
+                        segments.Where(x => x.PageNumber.HasValue).Select(x => x.PageNumber!.Value).Distinct().Count(),
             ChunkCount = chunks.Count,
+            OcrPageCount = pdfReport?.OcrPageCount ?? 0,
+            OcrAverageConfidence = pdfReport?.OcrAverageConfidence ?? 0,
+            ImportMode = pdfReport?.DocumentMode ?? "Text",
             ChunkFile = finalChunkName,
             VectorFile = finalVectorName,
             IndexedAt = DateTime.Now
@@ -341,6 +352,19 @@ public sealed class RagVectorIndexService
                 "Текущий RAG-индекс создан другой embedding-моделью или с другим document prefix. " +
                 "Смешивать такие вектора нельзя. Очистите RAG-индекс и проиндексируйте документы заново.");
         }
+    }
+
+    private static string BuildExtractionFingerprint(string path, AppConfig config)
+    {
+        if (!Path.GetExtension(path).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+            return "text-v1";
+
+        return string.Join("|",
+            "pdf-ocr-v1",
+            config.OcrEnabled,
+            Math.Clamp(config.OcrDpi, 150, 450),
+            Math.Clamp(config.OcrMinConfidence, 0.0, 1.0).ToString("0.000", System.Globalization.CultureInfo.InvariantCulture),
+            (config.OcrLanguages ?? "rus+eng").Trim().ToLowerInvariant());
     }
 
     private static string BuildEmbeddingFingerprint(string modelPath, string? documentPrefix, string? pooling)
