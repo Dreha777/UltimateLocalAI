@@ -84,6 +84,63 @@ public sealed class LlamaApiClient
         }
     }
 
+    public async Task<ModelServerProperties?> GetServerPropertiesAsync(int port, CancellationToken ct = default)
+    {
+        try
+        {
+            using var resp = await _http.GetAsync($"http://127.0.0.1:{port}/props", ct).ConfigureAwait(false);
+            if (!resp.IsSuccessStatusCode)
+            {
+                LogService.Warn($"GET /props returned HTTP {(int)resp.StatusCode}");
+                return null;
+            }
+
+            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false));
+            var root = doc.RootElement;
+            var result = new ModelServerProperties
+            {
+                ModelAlias = TryGetString(root, "model_alias"),
+                ModelFtype = TryGetString(root, "model_ftype"),
+                ChatTemplate = TryGetString(root, "chat_template")
+            };
+
+            if (root.TryGetProperty("default_generation_settings", out var defaults) &&
+                defaults.ValueKind == JsonValueKind.Object &&
+                defaults.TryGetProperty("n_ctx", out var nctx) &&
+                nctx.TryGetInt32(out var parsedContext))
+            {
+                result.ContextSize = parsedContext;
+            }
+
+            if (root.TryGetProperty("chat_template_caps", out var caps) && caps.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var property in caps.EnumerateObject())
+                {
+                    if (property.Value.ValueKind == JsonValueKind.True)
+                        result.ChatTemplateCapabilities.Add(property.Name);
+                }
+            }
+
+            return result;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
+        {
+            LogService.Warn("Model properties unavailable: " + ex.Message);
+            return null;
+        }
+    }
+
+    private static string TryGetString(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var property) ||
+            property.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+            return "";
+
+        return property.ValueKind == JsonValueKind.String
+            ? property.GetString() ?? ""
+            : property.ToString();
+    }
+
     public async Task<int> TokenCountAsync(int port, string text, CancellationToken ct = default)
     {
         try

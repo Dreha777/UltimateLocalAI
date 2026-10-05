@@ -34,6 +34,9 @@ public partial class MainWindow : Window
     private bool _modelStarting;
     private bool _modelReady;
     private int _activeContextSize = 4096;
+    private ModelServerProperties? _modelProperties;
+    private string _modelDiagnosticSummary = "";
+    private string _autoRuntimeWarning = "";
 
     public ObservableCollection<ChatSession> Chats { get; } = [];
     public ObservableCollection<UiMessage> Messages { get; } = [];
@@ -270,6 +273,9 @@ public partial class MainWindow : Window
             StartButton.Content = "Запустить";
             RefreshModelHeader();
             PerfText.Text = "";
+            _modelProperties = null;
+            _modelDiagnosticSummary = "";
+            _autoRuntimeWarning = "";
         }
         catch (Exception ex)
         {
@@ -324,6 +330,9 @@ public partial class MainWindow : Window
         ModelLoadProgress.Visibility = Visibility.Visible;
         PerfText.Text = "";
         BackendChoice? activeBackend = null;
+        _modelProperties = null;
+        _modelDiagnosticSummary = "";
+        _autoRuntimeWarning = "";
         try
         {
             var backend = _backendSelector.Select(_hardware, _config);
@@ -344,6 +353,12 @@ public partial class MainWindow : Window
                 BackendText.Text = $"{cpu.Name} · CUDA не запустилась, применён безопасный CPU fallback";
                 await _server.StartAsync(cpu, launchConfig);
             }
+            _modelProperties = await _api.GetServerPropertiesAsync(_config.Port);
+            if (_modelProperties?.ContextSize > 0)
+                _activeContextSize = _modelProperties.ContextSize;
+            _modelDiagnosticSummary = BuildModelDiagnosticSummary(_modelProperties);
+            LogModelDiagnostics(_modelProperties);
+
             _modelReady = true;
             TitleStatusText.Text = "Модель готова";
             ModelLoadProgress.Visibility = Visibility.Collapsed;
@@ -351,7 +366,13 @@ public partial class MainWindow : Window
             UnloadButton.IsEnabled = true;
             SendButton.IsEnabled = true;
             if (activeBackend is not null)
+            {
                 BackendText.Text = DescribeActiveBackend(activeBackend);
+                if (!string.IsNullOrWhiteSpace(_modelDiagnosticSummary))
+                    BackendText.Text += " · " + _modelDiagnosticSummary;
+            }
+            if (!string.IsNullOrWhiteSpace(_autoRuntimeWarning))
+                RuntimeStatusText.Text = "Модель готова · " + _autoRuntimeWarning;
             PromptBox.Focus();
             return true;
         }
@@ -386,6 +407,7 @@ public partial class MainWindow : Window
     {
         if (!string.Equals(_config.BackendMode, "Auto", StringComparison.OrdinalIgnoreCase))
         {
+            _autoRuntimeWarning = "";
             _activeContextSize = Math.Max(512, _config.Runtime.ContextSize);
             LogService.Info(
                 $"MANUAL-RUNTIME backend=\"{backend.Name}\" context={_config.Runtime.ContextSize} " +
@@ -398,6 +420,7 @@ public partial class MainWindow : Window
         HardwareDetector.RefreshMemory(_hardware);
         var profile = _autoRuntimeConfigurator.Create(_hardware, backend, _config.Runtime, _config.ModelPath);
         _activeContextSize = profile.Runtime.ContextSize;
+        _autoRuntimeWarning = profile.Warnings.Count == 0 ? "" : string.Join(" ", profile.Warnings);
         LogService.Info(AutoRuntimeConfigurator.ToLogLine(_hardware, backend, profile));
 
         return new AppConfig
@@ -466,8 +489,9 @@ public partial class MainWindow : Window
         if (_currentChat is null) return;
 
         var attachments = PendingAttachments.ToList();
+        var effectiveGeneration = CreateEffectiveGenerationSettings();
         var context = new StringBuilder();
-        var contextBudgetChars = Math.Max(4_000, _activeContextSize * 2);
+        var contextBudgetChars = Math.Max(2_000, GetPromptBudgetChars(effectiveGeneration) / 2);
         var remainingChars = contextBudgetChars;
         foreach (var a in attachments)
         {
@@ -560,8 +584,9 @@ public partial class MainWindow : Window
 
         try
         {
-            var history = _chatRepo.GetMessages(_currentChat.Id);
-            await _api.StreamChatAsync(_config.Port, history, _config.Generation, delta =>
+            var fullHistory = _chatRepo.GetMessages(_currentChat.Id);
+            var history = BuildQualityHistory(fullHistory, effectiveGeneration);
+            await _api.StreamChatAsync(_config.Port, history, effectiveGeneration, delta =>
             {
                 lock (pendingLock)
                     pendingText.Append(delta);
@@ -599,6 +624,188 @@ public partial class MainWindow : Window
             ScrollToBottom();
         }
     }
+
+    private GenerationSettings CreateEffectiveGenerationSettings()
+    {
+        var source = _config.Generation;
+        var result = new GenerationSettings
+        {
+            Temperature = source.Temperature,
+            TopP = source.TopP,
+            TopK = source.TopK,
+            MinP = source.MinP,
+            RepeatPenalty = source.RepeatPenalty,
+            MaxTokens = source.MaxTokens,
+            Seed = source.Seed,
+            SystemPrompt = source.SystemPrompt
+        };
+
+        if (!string.Equals(_config.BackendMode, "Auto", StringComparison.OrdinalIgnoreCase))
+            return result;
+
+        var recommended = _activeContextSize >= 8_192 ? 4_096
+            : _activeContextSize >= 4_096 ? 2_048
+            : Math.Max(768, _activeContextSize / 2);
+
+        var qualityNeedsMoreRoom = (_modelProperties?.SupportsReasoning ?? false) || source.MaxTokens <= 1_024;
+        if (qualityNeedsMoreRoom)
+        {
+            var hardCap = Math.Max(512, _activeContextSize - 768);
+            result.MaxTokens = Math.Min(Math.Max(source.MaxTokens, recommended), hardCap);
+        }
+
+        if (result.MaxTokens != source.MaxTokens)
+        {
+            LogService.Info($"QUALITY-GENERATION max_tokens={source.MaxTokens}->{result.MaxTokens} context={_activeContextSize} reasoning={_modelProperties?.SupportsReasoning == true}");
+        }
+
+        return result;
+    }
+
+    private int GetPromptBudgetChars(GenerationSettings generation)
+    {
+        var responseReserve = Math.Min(
+            Math.Max(256, generation.MaxTokens),
+            Math.Max(512, _activeContextSize / 2));
+        var promptTokens = Math.Max(512, _activeContextSize - responseReserve - 384);
+
+        // Conservative estimate for mixed Russian text/code. It is intentionally
+        // smaller than typical English chars/token so the server has headroom for
+        // the model's chat template and special tokens.
+        return Math.Max(2_500, promptTokens * 3);
+    }
+
+    private List<ChatMessage> BuildQualityHistory(IReadOnlyList<ChatMessage> history, GenerationSettings generation)
+    {
+        var charBudget = GetPromptBudgetChars(generation);
+        var selectedNewestFirst = new List<ChatMessage>();
+        var used = 0;
+
+        for (var i = history.Count - 1; i >= 0; i--)
+        {
+            var message = history[i];
+            var contentLength = message.Content?.Length ?? 0;
+            var contextLength = message.ContextText?.Length ?? 0;
+            var fixedCost = contentLength + 160;
+
+            if (selectedNewestFirst.Count == 0)
+            {
+                // Never drop the current user request. If its attached context is too
+                // large, keep both the beginning and the end instead of overflowing
+                // llama.cpp and letting it discard context implicitly.
+                var contextAllowance = Math.Max(0, charBudget - fixedCost);
+                var trimmedContext = TrimContextForBudget(message.ContextText, contextAllowance);
+                var clone = CloneChatMessage(message, trimmedContext);
+                selectedNewestFirst.Add(clone);
+                used = fixedCost + trimmedContext.Length;
+                continue;
+            }
+
+            var fullCost = fixedCost + contextLength;
+            if (used + fullCost > charBudget)
+                break;
+
+            selectedNewestFirst.Add(message);
+            used += fullCost;
+        }
+
+        selectedNewestFirst.Reverse();
+        if (selectedNewestFirst.Count < history.Count)
+            LogService.Info($"QUALITY-CONTEXT kept_messages={selectedNewestFirst.Count}/{history.Count} char_budget={charBudget} context={_activeContextSize}");
+
+        return selectedNewestFirst;
+    }
+
+    private static ChatMessage CloneChatMessage(ChatMessage source, string contextText) => new()
+    {
+        Id = source.Id,
+        ChatId = source.ChatId,
+        Role = source.Role,
+        Content = source.Content,
+        ContextText = contextText,
+        CreatedAt = source.CreatedAt,
+        Attachments = source.Attachments
+    };
+
+    private static string TrimContextForBudget(string? text, int maxChars)
+    {
+        if (string.IsNullOrEmpty(text) || maxChars <= 0) return "";
+        if (text.Length <= maxChars) return text;
+        if (maxChars < 300) return text[..maxChars];
+
+        const string markerText = "\n\n[...контекст сокращён программой для сохранения места под качественный ответ...]\n\n";
+        var payload = Math.Max(100, maxChars - markerText.Length);
+        var first = payload * 2 / 3;
+        var last = payload - first;
+        return text[..first] + markerText + text[^last..];
+    }
+
+    private string BuildModelDiagnosticSummary(ModelServerProperties? properties)
+    {
+        if (properties is null)
+            return "свойства GGUF недоступны";
+
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(properties.ModelFtype))
+            parts.Add("GGUF " + CompactUi(properties.ModelFtype, 36));
+        if (properties.ContextSize > 0)
+            parts.Add("ctx " + properties.ContextSize);
+        parts.Add(properties.HasChatTemplate ? "chat-template ✓" : "chat-template ?");
+        if (properties.SupportsReasoning)
+            parts.Add("reasoning ✓");
+
+        var quant = QuantizationQualityLabel(properties);
+        if (!string.IsNullOrWhiteSpace(quant))
+            parts.Add(quant);
+
+        return string.Join(" · ", parts);
+    }
+
+    private void LogModelDiagnostics(ModelServerProperties? properties)
+    {
+        if (properties is null)
+        {
+            LogService.Warn("MODEL-PROPS unavailable");
+            return;
+        }
+
+        var caps = properties.ChatTemplateCapabilities.Count == 0
+            ? "-"
+            : string.Join(",", properties.ChatTemplateCapabilities);
+        LogService.Info(
+            $"MODEL-PROPS alias=\"{properties.ModelAlias}\" ftype=\"{properties.ModelFtype}\" " +
+            $"context={properties.ContextSize} template={(properties.HasChatTemplate ? "yes" : "no")} caps=\"{caps}\" reasoning={properties.SupportsReasoning}");
+
+        var quality = QuantizationQualityLabel(properties);
+        if (quality.Contains("низкая", StringComparison.OrdinalIgnoreCase))
+            LogService.Warn("MODEL-QUALITY " + quality + ". Качество ограничено самим GGUF; runtime-параметры не могут восстановить потерянные веса.");
+        if (!properties.HasChatTemplate)
+            LogService.Warn("MODEL-QUALITY chat template отсутствует в /props; ответы chat-модели могут быть хуже ожидаемых.");
+    }
+
+    private string QuantizationQualityLabel(ModelServerProperties properties)
+    {
+        var source = ((properties.ModelFtype ?? "") + " " + Path.GetFileName(_config.ModelPath)).ToUpperInvariant();
+
+        if (source.Contains("IQ1") || source.Contains("IQ2") ||
+            source.Contains("Q2_") || source.Contains("Q2-") ||
+            source.Contains("Q3_") || source.Contains("Q3-"))
+            return "⚠ низкая точность квантования";
+
+        if (source.Contains("Q4_") || source.Contains("Q4-"))
+            return "Q4: баланс качества/памяти";
+
+        if (source.Contains("Q5_") || source.Contains("Q5-") ||
+            source.Contains("Q6_") || source.Contains("Q6-") ||
+            source.Contains("Q8_") || source.Contains("Q8-") ||
+            source.Contains("F16") || source.Contains("BF16") || source.Contains("F32"))
+            return "квантование высокого качества";
+
+        return "";
+    }
+
+    private static string CompactUi(string value, int max) =>
+        value.Length <= max ? value : value[..max] + "…";
 
     private void PromptBox_PreviewKeyDown(object sender, KeyEventArgs e)
     {
