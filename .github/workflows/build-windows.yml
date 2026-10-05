@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - stage-7e-2b-gguf-metadata
     paths-ignore:
       - '**/*.md'
 
