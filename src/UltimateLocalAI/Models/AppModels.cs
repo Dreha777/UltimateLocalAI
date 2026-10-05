@@ -21,6 +21,11 @@ public sealed class AppConfig
     public string EmbeddingDocumentPrefix { get; set; } = "";
     public string EmbeddingQueryPrefix { get; set; } = "";
     public string EmbeddingPooling { get; set; } = "Auto";
+    public string RerankerModelPath { get; set; } = "";
+    public int RerankerPort { get; set; } = 8091;
+    public bool UseReranker { get; set; } = true;
+    public int RagCandidateTopK { get; set; } = 24;
+    public int RagFinalTopK { get; set; } = 6;
     public RuntimeSettings Runtime { get; set; } = new();
     public GenerationSettings Generation { get; set; } = new();
 }
@@ -240,8 +245,18 @@ public sealed class KnowledgeDocument
 public sealed class KnowledgeHit
 {
     public string SourcePath { get; set; } = "";
+    public string DisplayName { get; set; } = "";
     public string Content { get; set; } = "";
+    public string Section { get; set; } = "";
+    public int? PageFrom { get; set; }
+    public int? PageTo { get; set; }
     public double Score { get; set; }
+    public double SemanticScore { get; set; }
+    public double? RerankScore { get; set; }
+    public string RetrievalMethod { get; set; } = "";
+    public string PageLabel => PageFrom.HasValue
+        ? PageTo.HasValue && PageTo != PageFrom ? $"стр. {PageFrom}–{PageTo}" : $"стр. {PageFrom}"
+        : "";
 }
 
 
@@ -303,4 +318,21 @@ public sealed class RagIndexProgress
     public int Completed { get; set; }
     public int Total { get; set; }
     public string Message { get; set; } = "";
+}
+
+
+public sealed class RagRetrievalDiagnostics
+{
+    public string EmbeddingModelName { get; set; } = "";
+    public string RerankerModelName { get; set; } = "";
+    public int CandidateCount { get; set; }
+    public int ReturnedCount { get; set; }
+    public bool UsedReranker { get; set; }
+    public string Status { get; set; } = "";
+}
+
+public sealed class RagRetrievalResult
+{
+    public List<KnowledgeHit> Hits { get; set; } = [];
+    public RagRetrievalDiagnostics Diagnostics { get; set; } = new();
 }
