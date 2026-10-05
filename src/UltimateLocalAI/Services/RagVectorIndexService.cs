@@ -162,7 +162,7 @@ public sealed class RagVectorIndexService
     {
         var file = new FileInfo(path);
         var sha256 = await ComputeSha256Async(path, ct);
-        var extractionFingerprint = BuildExtractionFingerprint(path, config);
+        var extractionFingerprint = BuildExtractionFingerprint(path, config, vision?.IsReady == true);
         var existing = manifest.Documents.FirstOrDefault(x =>
             string.Equals(x.SourcePath, path, StringComparison.OrdinalIgnoreCase));
 
@@ -391,7 +391,7 @@ public sealed class RagVectorIndexService
         }
     }
 
-    private static string BuildExtractionFingerprint(string path, AppConfig config)
+    private static string BuildExtractionFingerprint(string path, AppConfig config, bool visionReady)
     {
         if (!Path.GetExtension(path).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
             return "text-v1";
@@ -405,6 +405,7 @@ public sealed class RagVectorIndexService
             config.OcrRestorationEnabled,
             Math.Clamp(config.OcrMaxDeskewDegrees, 0, 20).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture),
             config.DocumentVisionEnabled,
+            config.DocumentVisionEnabled ? (visionReady ? "vision-active" : "vision-unavailable") : "vision-off",
             config.DocumentVisionAnalyzeAllPages,
             Math.Clamp(config.DocumentVisionDpi, 140, 320),
             FileIdentity(config.DocumentVisionModelPath),
