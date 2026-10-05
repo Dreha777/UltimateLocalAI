@@ -19,9 +19,14 @@ public sealed class DocumentVisionApiClient
         if (!File.Exists(imagePath))
             throw new FileNotFoundException("Изображение страницы для Vision не найдено.", imagePath);
 
-        var bytes = await File.ReadAllBytesAsync(imagePath, ct);
-        var base64 = Convert.ToBase64String(bytes);
-        var dataUri = "data:image/png;base64," + base64;
+        var relative = Path.GetRelativePath(AppPaths.TempDir, Path.GetFullPath(imagePath));
+        if (relative.StartsWith("..", StringComparison.Ordinal))
+            throw new InvalidOperationException("Vision image находится вне разрешённой временной папки.");
+
+        var localMediaUrl = "file://" + string.Join("/",
+            relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                .Where(x => x.Length > 0)
+                .Select(Uri.EscapeDataString));
 
         var ocrContext = string.IsNullOrWhiteSpace(extractedText)
             ? "No reliable OCR/text-layer context is available."
@@ -41,33 +46,27 @@ public sealed class DocumentVisionApiClient
             "If the page contains no meaningful formulas, tables, graphs, figures, diagrams or other non-prose visual information, answer exactly: VISUAL_EMPTY\n\n" +
             ocrContext;
 
-        var body = new
+        var endpoint = $"http://127.0.0.1:{port}/v1/chat/completions";
+        var first = await SendAsync(endpoint, prompt, localMediaUrl, ct);
+
+        string json;
+        if (first.Success)
         {
-            model = "document-vision",
-            messages = new object[]
-            {
-                new
-                {
-                    role = "user",
-                    content = new object[]
-                    {
-                        new { type = "text", text = prompt },
-                        new { type = "image_url", image_url = new { url = dataUri } }
-                    }
-                }
-            },
-            stream = false,
-            temperature = 0.05,
-            top_p = 0.9,
-            max_tokens = 2200
-        };
+            json = first.Body;
+        }
+        else
+        {
+            LogService.Warn(
+                $"Document Vision local-media request failed HTTP {first.StatusCode}; retrying base64 fallback.");
 
-        using var response = await _http.PostAsJsonAsync(
-            $"http://127.0.0.1:{port}/v1/chat/completions", body, ct);
-        var json = await response.Content.ReadAsStringAsync(ct);
-
-        if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"Document Vision HTTP {(int)response.StatusCode}: {Compact(json)}");
+            var bytes = await File.ReadAllBytesAsync(imagePath, ct);
+            var base64Url = "data:image/png;base64," + Convert.ToBase64String(bytes);
+            var second = await SendAsync(endpoint, prompt, base64Url, ct);
+            if (!second.Success)
+                throw new InvalidOperationException(
+                    $"Document Vision HTTP {second.StatusCode}: {Compact(second.Body)}");
+            json = second.Body;
+        }
 
         using var document = JsonDocument.Parse(json);
         var content = ExtractContent(document.RootElement).Trim();
@@ -84,6 +83,38 @@ public sealed class DocumentVisionApiClient
             ModelName = modelName,
             Status = empty ? "Визуальные элементы не обнаружены" : "Визуальные элементы распознаны"
         };
+    }
+
+    private async Task<(bool Success, int StatusCode, string Body)> SendAsync(
+        string endpoint,
+        string prompt,
+        string mediaUrl,
+        CancellationToken ct)
+    {
+        var body = new
+        {
+            model = "document-vision",
+            messages = new object[]
+            {
+                new
+                {
+                    role = "user",
+                    content = new object[]
+                    {
+                        new { type = "text", text = prompt },
+                        new { type = "image_url", image_url = new { url = mediaUrl } }
+                    }
+                }
+            },
+            stream = false,
+            temperature = 0.05,
+            top_p = 0.9,
+            max_tokens = 2200
+        };
+
+        using var response = await _http.PostAsJsonAsync(endpoint, body, ct);
+        var responseBody = await response.Content.ReadAsStringAsync(ct);
+        return (response.IsSuccessStatusCode, (int)response.StatusCode, responseBody);
     }
 
     private static string StripOuterFence(string content)
