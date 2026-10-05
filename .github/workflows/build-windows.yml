@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - stage-7f-model-manager
     paths-ignore:
       - '**/*.md'
 
