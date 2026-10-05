@@ -42,6 +42,12 @@ public partial class KnowledgeBaseWindow : Window
         OcrConfidenceBox.Text = _config.OcrMinConfidence.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
         OcrRestorationBox.IsChecked = _config.OcrRestorationEnabled;
         OcrMaxDeskewBox.Text = _config.OcrMaxDeskewDegrees.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+        VisionModelPathBox.Text = _config.DocumentVisionModelPath;
+        VisionMmprojPathBox.Text = _config.DocumentVisionMmprojPath;
+        VisionEnabledBox.IsChecked = _config.DocumentVisionEnabled;
+        VisionAllPagesBox.IsChecked = _config.DocumentVisionAnalyzeAllPages;
+        VisionGpuBox.IsChecked = _config.DocumentVisionUseGpu;
+        VisionDpiBox.Text = _config.DocumentVisionDpi.ToString();
 
         Loaded += (_, _) => Refresh();
         Closing += (_, _) =>
@@ -78,6 +84,12 @@ public partial class KnowledgeBaseWindow : Window
         else
             OcrStatusText.Text = "OCR не готов: " + ocrReason;
 
+        VisionStatusText.Text = !_config.DocumentVisionEnabled
+            ? "Vision выключен"
+            : File.Exists(_config.DocumentVisionModelPath) && File.Exists(_config.DocumentVisionMmprojPath)
+                ? $"Vision настроен: {Path.GetFileName(_config.DocumentVisionModelPath)} · runtime Latest"
+                : "Vision включён, но GGUF/mmproj ещё не выбраны";
+
         var chatName = File.Exists(_config.ModelPath) ? Path.GetFileName(_config.ModelPath) : "не выбрана";
         ModelIndependenceText.Text = manifest.Documents.Count == 0
             ? $"Chat-модель: {chatName}. Индекс ещё пуст. После первой индексации embedding-модель фиксирует векторное пространство библиотеки."
@@ -100,6 +112,12 @@ public partial class KnowledgeBaseWindow : Window
         _config.OcrMinConfidence = ParseDouble(OcrConfidenceBox.Text, 0.45, 0, 1);
         _config.OcrRestorationEnabled = OcrRestorationBox.IsChecked == true;
         _config.OcrMaxDeskewDegrees = ParseDouble(OcrMaxDeskewBox.Text, 12.0, 0, 20);
+        _config.DocumentVisionModelPath = VisionModelPathBox.Text.Trim();
+        _config.DocumentVisionMmprojPath = VisionMmprojPathBox.Text.Trim();
+        _config.DocumentVisionEnabled = VisionEnabledBox.IsChecked == true;
+        _config.DocumentVisionAnalyzeAllPages = VisionAllPagesBox.IsChecked == true;
+        _config.DocumentVisionUseGpu = VisionGpuBox.IsChecked == true;
+        _config.DocumentVisionDpi = ParseInt(VisionDpiBox.Text, 220, 140, 320);
         _configService.Save(_config);
     }
 
@@ -158,6 +176,69 @@ public partial class KnowledgeBaseWindow : Window
         UseRerankerBox.IsChecked = true;
         SaveEmbeddingSettings();
         StatusText.Text = $"Reranker выбран: {Path.GetFileName(dlg.FileName)}. Его можно менять без перестройки RAG-индекса.";
+    }
+
+    private void SelectVisionModel_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFileDialog
+        {
+            Filter = "Vision GGUF (*.gguf)|*.gguf|Все файлы (*.*)|*.*",
+            Title = "Выберите мультимодальную GGUF-модель"
+        };
+
+        if (File.Exists(_config.DocumentVisionModelPath))
+            dlg.InitialDirectory = Path.GetDirectoryName(_config.DocumentVisionModelPath);
+        else if (File.Exists(_config.ModelPath))
+            dlg.InitialDirectory = Path.GetDirectoryName(_config.ModelPath);
+
+        if (dlg.ShowDialog(this) != true)
+            return;
+
+        VisionModelPathBox.Text = dlg.FileName;
+        VisionEnabledBox.IsChecked = true;
+
+        var folder = Path.GetDirectoryName(dlg.FileName);
+        if (!string.IsNullOrWhiteSpace(folder) && Directory.Exists(folder))
+        {
+            var mmproj = Directory.EnumerateFiles(folder, "*.gguf")
+                .FirstOrDefault(x =>
+                    !string.Equals(Path.GetFullPath(x), Path.GetFullPath(dlg.FileName), StringComparison.OrdinalIgnoreCase) &&
+                    Path.GetFileName(x).Contains("mmproj", StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(mmproj))
+                VisionMmprojPathBox.Text = mmproj;
+        }
+
+        SaveEmbeddingSettings();
+        Refresh();
+        StatusText.Text = string.IsNullOrWhiteSpace(VisionMmprojPathBox.Text)
+            ? "Vision GGUF выбрана. Теперь укажите соответствующий mmproj."
+            : "Vision GGUF и mmproj выбраны. При следующей индексации PDF будет добавлен визуальный слой.";
+    }
+
+    private void SelectVisionMmproj_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFileDialog
+        {
+            Filter = "mmproj GGUF (*.gguf)|*.gguf|Все файлы (*.*)|*.*",
+            Title = "Выберите mmproj для vision-модели"
+        };
+
+        var start = File.Exists(VisionModelPathBox.Text)
+            ? Path.GetDirectoryName(VisionModelPathBox.Text)
+            : File.Exists(_config.DocumentVisionMmprojPath)
+                ? Path.GetDirectoryName(_config.DocumentVisionMmprojPath)
+                : null;
+        if (!string.IsNullOrWhiteSpace(start))
+            dlg.InitialDirectory = start;
+
+        if (dlg.ShowDialog(this) != true)
+            return;
+
+        VisionMmprojPathBox.Text = dlg.FileName;
+        VisionEnabledBox.IsChecked = true;
+        SaveEmbeddingSettings();
+        Refresh();
+        StatusText.Text = "Vision mmproj выбран. Визуальное содержание будет индексироваться вместе с текстом.";
     }
 
     private void PdfScanner_Click(object sender, RoutedEventArgs e)
