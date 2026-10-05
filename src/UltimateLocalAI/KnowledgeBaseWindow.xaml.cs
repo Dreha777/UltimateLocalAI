@@ -244,7 +244,7 @@ public partial class KnowledgeBaseWindow : Window
     private void PdfScanner_Click(object sender, RoutedEventArgs e)
     {
         SaveEmbeddingSettings();
-        var win = new PdfScannerWindow(_config, _configService) { Owner = this };
+        var win = new PdfScannerWindow(_config, _configService, _hardware) { Owner = this };
         win.ShowDialog();
 
         OcrEnabledBox.IsChecked = _config.OcrEnabled;
