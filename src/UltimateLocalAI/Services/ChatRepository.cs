@@ -157,7 +157,9 @@ public sealed class ChatRepository
             Snippet = s.Snippet,
             SemanticScore = s.SemanticScore,
             RerankScore = s.RerankScore,
-            RetrievalMethod = s.RetrievalMethod
+            RetrievalMethod = s.RetrievalMethod,
+            ExtractionMode = s.ExtractionMode,
+            OcrConfidence = s.OcrConfidence
         }).ToList()
     };
 }
