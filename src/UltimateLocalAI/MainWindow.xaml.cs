@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     private readonly FileTextExtractor _extractor = new();
     private readonly KnowledgeBaseService _knowledge;
     private readonly RagVectorIndexService _ragIndex;
+    private readonly RagRetrievalService _ragRetrieval;
     private readonly ResourceMonitorService _resourceMonitor = new();
     private readonly System.Windows.Threading.DispatcherTimer _resourceTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private bool _resourceRefreshBusy;
@@ -57,6 +58,7 @@ public partial class MainWindow : Window
         _activeContextSize = Math.Max(512, _config.Runtime.ContextSize);
         _knowledge = new KnowledgeBaseService(_extractor);
         _ragIndex = new RagVectorIndexService(_extractor, _backendSelector);
+        _ragRetrieval = new RagRetrievalService(_backendSelector);
         _server.StatusChanged += s => Dispatcher.Invoke(() =>
         {
             RuntimeStatusText.Text = s;
@@ -584,16 +586,65 @@ public partial class MainWindow : Window
         }
         if (_config.UseKnowledgeBase && !string.IsNullOrWhiteSpace(prompt) && remainingChars > 1000)
         {
-            var hits = _knowledge.Search(prompt, 5);
+            List<KnowledgeHit> hits = [];
+            RagRetrievalDiagnostics? diagnostics = null;
+
+            try
+            {
+                RuntimeStatusText.Text = "RAG: семантический поиск по библиотеке…";
+                HardwareDetector.RefreshMemory(_hardware);
+                using var ragTimeout = new CancellationTokenSource(TimeSpan.FromMinutes(4));
+                var rag = await _ragRetrieval.SearchAsync(prompt, _config, _hardware, ragTimeout.Token);
+                hits = rag.Hits;
+                diagnostics = rag.Diagnostics;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                LogService.Warn("RAG semantic retrieval failed, lexical fallback: " + ex.Message);
+                RuntimeStatusText.Text = "RAG semantic недоступен · fallback на текстовый поиск";
+            }
+
+            if (hits.Count == 0)
+            {
+                hits = _knowledge.Search(prompt, Math.Clamp(_config.RagFinalTopK, 1, 10));
+                foreach (var hit in hits)
+                {
+                    hit.DisplayName = Path.GetFileName(hit.SourcePath);
+                    hit.RetrievalMethod = "lexical fallback";
+                }
+            }
+
             if (hits.Count > 0)
             {
-                context.AppendLine("\n### Фрагменты локальной базы знаний");
+                context.AppendLine("\n### RAG 2.0 · найденные источники");
+                context.AppendLine("Правила: используй эти фрагменты как справочный материал. Если приводишь факт из них, указывай ссылку вида [Источник N]. Не выдумывай отсутствующие в источниках сведения.");
+
+                var sourceNumber = 0;
                 foreach (var hit in hits)
                 {
                     remainingChars = contextBudgetChars - context.Length;
                     if (remainingChars <= 500) break;
-                    var block = $"\nИсточник: {Path.GetFileName(hit.SourcePath)}\n{hit.Content}\n";
-                    context.Append(block.AsSpan(0, Math.Min(block.Length, remainingChars)));
+
+                    sourceNumber++;
+                    var name = string.IsNullOrWhiteSpace(hit.DisplayName)
+                        ? Path.GetFileName(hit.SourcePath)
+                        : hit.DisplayName;
+                    var page = string.IsNullOrWhiteSpace(hit.PageLabel) ? "" : $" · {hit.PageLabel}";
+                    var section = string.IsNullOrWhiteSpace(hit.Section) ? "" : $" · раздел: {hit.Section}";
+                    var header = $"\n[Источник {sourceNumber}] {name}{page}{section}\n";
+                    var bodyBudget = Math.Max(0, remainingChars - header.Length - 2);
+                    var body = hit.Content.Length <= bodyBudget
+                        ? hit.Content
+                        : hit.Content[..bodyBudget];
+
+                    context.Append(header).Append(body).AppendLine();
+                }
+
+                if (diagnostics is not null)
+                {
+                    LogService.Info(
+                        $"RAG-CONTEXT method=\"{diagnostics.Status}\" embedding=\"{diagnostics.EmbeddingModelName}\" " +
+                        $"reranker=\"{diagnostics.RerankerModelName}\" candidates={diagnostics.CandidateCount} returned={diagnostics.ReturnedCount}");
                 }
             }
         }
