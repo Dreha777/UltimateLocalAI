@@ -16,6 +16,8 @@ public sealed class AppConfig
     public bool UseKnowledgeBase { get; set; } = false;
     public string WorkspaceBackground { get; set; } = "Светло-серый";
     public List<string> ModelFolders { get; set; } = [];
+    public string EmbeddingModelPath { get; set; } = "";
+    public int EmbeddingPort { get; set; } = 8090;
     public RuntimeSettings Runtime { get; set; } = new();
     public GenerationSettings Generation { get; set; } = new();
 }
@@ -226,6 +228,10 @@ public sealed class KnowledgeDocument
     public string SourcePath { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public DateTime IndexedAt { get; set; }
+    public int PageCount { get; set; }
+    public int ChunkCount { get; set; }
+    public string IndexStatus { get; set; } = "";
+    public string EmbeddingModelName { get; set; } = "";
 }
 
 public sealed class KnowledgeHit
@@ -233,4 +239,63 @@ public sealed class KnowledgeHit
     public string SourcePath { get; set; } = "";
     public string Content { get; set; } = "";
     public double Score { get; set; }
+}
+
+
+public sealed class RagSourceSegment
+{
+    public int? PageNumber { get; set; }
+    public string Section { get; set; } = "";
+    public string Content { get; set; } = "";
+}
+
+public sealed class RagChunkRecord
+{
+    public long ChunkId { get; set; }
+    public long DocumentId { get; set; }
+    public int ChunkIndex { get; set; }
+    public int? PageFrom { get; set; }
+    public int? PageTo { get; set; }
+    public string Section { get; set; } = "";
+    public string SourcePath { get; set; } = "";
+    public string Content { get; set; } = "";
+    public int VectorIndex { get; set; }
+}
+
+public sealed class RagIndexedDocument
+{
+    public long Id { get; set; }
+    public string SourcePath { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public long SourceSizeBytes { get; set; }
+    public DateTime SourceLastWriteUtc { get; set; }
+    public string SourceSha256 { get; set; } = "";
+    public int PageCount { get; set; }
+    public int ChunkCount { get; set; }
+    public string ChunkFile { get; set; } = "";
+    public string VectorFile { get; set; } = "";
+    public DateTime IndexedAt { get; set; }
+}
+
+public sealed class RagIndexManifest
+{
+    public int Version { get; set; } = 1;
+    public long NextDocumentId { get; set; } = 1;
+    public long NextChunkId { get; set; } = 1;
+    public string EmbeddingModelPath { get; set; } = "";
+    public string EmbeddingModelFingerprint { get; set; } = "";
+    public string EmbeddingModelName { get; set; } = "";
+    public int VectorDimensions { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
+    public List<RagIndexedDocument> Documents { get; set; } = [];
+}
+
+public sealed class RagIndexProgress
+{
+    public string Phase { get; set; } = "";
+    public string FileName { get; set; } = "";
+    public int Completed { get; set; }
+    public int Total { get; set; }
+    public string Message { get; set; } = "";
 }
