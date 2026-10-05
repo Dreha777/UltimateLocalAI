@@ -280,7 +280,8 @@ public static class OcrCandidateSelector
                 best = current;
         }
 
-        best ??= throw new InvalidOperationException("OCR не смог оценить кандидатов.");
+        if (best is null)
+            throw new InvalidOperationException("OCR не смог оценить кандидатов.");
         raw ??= best.Recognition;
 
         // Conservative rule: preprocessing must clearly beat the original,
