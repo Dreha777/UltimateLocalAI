@@ -41,6 +41,13 @@ Ultimate Local AI uses .NET 8 / WPF for the Windows graphical application and se
 - License: MIT
 - Purpose: creation of native Microsoft Word DOCX chat exports without requiring Microsoft Office.
 
+## PdfPig
+
+- Package: PdfPig 0.1.6
+- Project: PdfPig
+- License: Apache-2.0
+- Purpose: page-aware text extraction from text-layer PDF documents for the local RAG index.
+
 ## CUDA / Vulkan
 
 The build system can use NVIDIA CUDA Toolkit and LunarG Vulkan SDK to compile GPU-enabled llama.cpp backends. These SDKs are governed by their own vendor license terms.
