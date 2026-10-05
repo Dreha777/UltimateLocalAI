@@ -105,6 +105,7 @@
                         <TextBlock x:Name="BackendText" Text="Выберите GGUF-файл" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="0,2,0,0"/>
                     </StackPanel>
                     <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Style="{StaticResource SoftButton}" Content="Модели" Click="Models_Click" Margin="0,0,8,0" ToolTip="Каталог GGUF-моделей и советник качества"/>
                         <Button Style="{StaticResource SoftButton}" Content="Выбрать GGUF" Click="SelectModel_Click" Margin="0,0,8,0"/>
                         <Button x:Name="StartButton" Style="{StaticResource AccentButton}" Content="Запустить" Click="StartModel_Click" Margin="0,0,8,0"/>
                         <Button x:Name="UnloadButton" Style="{StaticResource SoftButton}" Content="Выгрузить" Click="UnloadModel_Click" IsEnabled="False" Margin="0,0,8,0" ToolTip="Остановить llama-server и освободить RAM/VRAM"/>
@@ -188,6 +189,14 @@
                             <TextBlock Text="Путь Custom runtime" FontWeight="SemiBold" Margin="0,10,0,0"/><TextBlock Text="Укажите папку, содержащую подпапки cpu-avx / cpu-avx2 / cuda-pascal-avx и т.п. Для Stable/Latest поле игнорируется." FontSize="11" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"/><TextBox x:Name="CustomRuntimePathBox"/>
                             <TextBlock Text="Backend" FontWeight="SemiBold" Margin="0,13,0,0"/><TextBlock Text="Авто выбирает AVX/AVX2/CUDA по железу. Xeon E3-1270 + GTX 1050 использует отдельный CUDA Pascal sm_61 backend." FontSize="11" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,2,0,5"/>
                             <ComboBox x:Name="BackendModeBox" ItemsSource="{Binding BackendModes}"/>
+
+                            <TextBlock Text="Профиль Auto" FontWeight="SemiBold" Margin="0,13,0,0"/>
+                            <TextBlock Text="Качество — максимум качества при доступной памяти; Баланс — умеренный расход RAM/VRAM; Экономия — для слабых ПК." FontSize="11" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,2,0,5"/>
+                            <ComboBox x:Name="AutoProfileBox">
+                                <ComboBoxItem Content="Качество"/>
+                                <ComboBoxItem Content="Баланс"/>
+                                <ComboBoxItem Content="Экономия"/>
+                            </ComboBox>
 
                             <TextBlock Text="Тема интерфейса" FontWeight="SemiBold" Margin="0,13,0,0"/>
                             <TextBlock Text="Меняет оформление всего окна программы. Настройка сохраняется между запусками." FontSize="11" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,2,0,5"/>
