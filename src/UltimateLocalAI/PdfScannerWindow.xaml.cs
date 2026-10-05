@@ -79,7 +79,7 @@ public partial class PdfScannerWindow : Window
 
         try
         {
-            var result = await _extractor.ExtractAsync(path, _config, progress, _cts.Token);
+            var result = await _extractor.ExtractAsync(path, _config, progress, null, _cts.Token);
             var report = result.PdfReport ?? throw new InvalidDataException("Не удалось получить отчёт анализа PDF.");
 
             PagesList.ItemsSource = report.Pages;
