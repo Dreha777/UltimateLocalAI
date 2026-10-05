@@ -56,7 +56,8 @@ public sealed class RagVectorIndexService
                 EmbeddingModelName = manifest.EmbeddingModelName,
                 OcrPageCount = x.OcrPageCount,
                 OcrAverageConfidence = x.OcrAverageConfidence,
-                ImportMode = x.ImportMode
+                ImportMode = x.ImportMode,
+                VisionPageCount = x.VisionPageCount
             })
             .ToList();
     }
@@ -82,12 +83,45 @@ public sealed class RagVectorIndexService
 
         await _gate.WaitAsync(ct);
         await using var server = new EmbeddingServerManager();
+        await using var vision = new DocumentVisionSession(_backendSelector, hardware, config);
         try
         {
             AppPaths.EnsureDirectories();
             var manifest = GetManifest();
             var fingerprint = BuildEmbeddingFingerprint(config.EmbeddingModelPath, config.EmbeddingDocumentPrefix, config.EmbeddingPooling);
             ValidateEmbeddingSpace(manifest, config, fingerprint);
+
+            if (config.DocumentVisionEnabled &&
+                actual.Any(x => Path.GetExtension(x).Equals(".pdf", StringComparison.OrdinalIgnoreCase)))
+            {
+                if (File.Exists(config.DocumentVisionModelPath) && File.Exists(config.DocumentVisionMmprojPath))
+                {
+                    try
+                    {
+                        progress?.Report(new RagIndexProgress
+                        {
+                            Phase = "vision-server",
+                            Message = "Загрузка Document Vision модели…",
+                            Total = actual.Count
+                        });
+                        await vision.StartAsync(ct);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        LogService.Warn("Document Vision disabled for this indexing run: " + ex.Message);
+                        progress?.Report(new RagIndexProgress
+                        {
+                            Phase = "vision-fallback",
+                            Message = "Document Vision недоступен; продолжаем текст/OCR без визуального анализа.",
+                            Total = actual.Count
+                        });
+                    }
+                }
+                else
+                {
+                    LogService.Info("Document Vision enabled but GGUF/mmproj is not configured; text/OCR indexing continues.");
+                }
+            }
 
             var backend = _backendSelector.CpuFallback(hardware, config);
             progress?.Report(new RagIndexProgress
@@ -103,7 +137,7 @@ public sealed class RagVectorIndexService
             {
                 ct.ThrowIfCancellationRequested();
                 var path = actual[fileIndex];
-                await IndexOneAsync(path, config, manifest, fingerprint, fileIndex, actual.Count, progress, ct);
+                await IndexOneAsync(path, config, manifest, fingerprint, fileIndex, actual.Count, progress, vision.IsReady ? vision : null, ct);
             }
 
             SaveManifest(manifest);
@@ -123,6 +157,7 @@ public sealed class RagVectorIndexService
         int fileIndex,
         int fileTotal,
         IProgress<RagIndexProgress>? progress,
+        DocumentVisionSession? vision,
         CancellationToken ct)
     {
         var file = new FileInfo(path);
@@ -157,7 +192,7 @@ public sealed class RagVectorIndexService
             Message = "Извлечение структуры документа…"
         });
 
-        var extraction = await _extractor.ExtractAsync(path, config, progress, ct);
+        var extraction = await _extractor.ExtractAsync(path, config, progress, vision, ct);
         var segments = extraction.Segments;
         var pdfReport = extraction.PdfReport;
 
@@ -268,6 +303,8 @@ public sealed class RagVectorIndexService
             OcrPageCount = pdfReport?.OcrPageCount ?? 0,
             OcrAverageConfidence = pdfReport?.OcrAverageConfidence ?? 0,
             ImportMode = pdfReport?.DocumentMode ?? "Text",
+            VisionPageCount = pdfReport?.VisionPageCount ?? 0,
+            VisionModelName = pdfReport?.VisionModelName ?? "",
             ChunkFile = finalChunkName,
             VectorFile = finalVectorName,
             IndexedAt = DateTime.Now
@@ -360,13 +397,38 @@ public sealed class RagVectorIndexService
             return "text-v1";
 
         return string.Join("|",
-            "pdf-ocr-v1",
+            "pdf-vision-v1",
             config.OcrEnabled,
             Math.Clamp(config.OcrDpi, 150, 450),
             Math.Clamp(config.OcrMinConfidence, 0.0, 1.0).ToString("0.000", System.Globalization.CultureInfo.InvariantCulture),
             (config.OcrLanguages ?? "rus+eng").Trim().ToLowerInvariant(),
             config.OcrRestorationEnabled,
-            Math.Clamp(config.OcrMaxDeskewDegrees, 0, 20).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture));
+            Math.Clamp(config.OcrMaxDeskewDegrees, 0, 20).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture),
+            config.DocumentVisionEnabled,
+            config.DocumentVisionAnalyzeAllPages,
+            Math.Clamp(config.DocumentVisionDpi, 140, 320),
+            FileIdentity(config.DocumentVisionModelPath),
+            FileIdentity(config.DocumentVisionMmprojPath));
+    }
+
+    private static string FileIdentity(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return "none";
+
+        try
+        {
+            var canonical = Path.GetFullPath(path);
+            if (!File.Exists(canonical))
+                return "missing:" + canonical.ToUpperInvariant();
+
+            var file = new FileInfo(canonical);
+            return string.Join(":", canonical.ToUpperInvariant(), file.Length, file.LastWriteTimeUtc.Ticks);
+        }
+        catch
+        {
+            return "invalid:" + path;
+        }
     }
 
     private static string BuildEmbeddingFingerprint(string modelPath, string? documentPrefix, string? pooling)
