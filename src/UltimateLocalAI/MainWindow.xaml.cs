@@ -652,7 +652,7 @@ public partial class MainWindow : Window
         {
             Title = "Экспорт текущего чата",
             FileName = safeTitle,
-            Filter = "Документ Word / RTF (*.rtf)|*.rtf|PDF (*.pdf)|*.pdf",
+            Filter = "Word DOCX (*.docx)|*.docx|PDF (*.pdf)|*.pdf|Word / RTF (*.rtf)|*.rtf|Текст UTF-8 (*.txt)|*.txt|Markdown (*.md)|*.md|HTML (*.html)|*.html|JSON (*.json)|*.json",
             FilterIndex = 1,
             AddExtension = true,
             OverwritePrompt = true
@@ -661,10 +661,7 @@ public partial class MainWindow : Window
 
         try
         {
-            if (dlg.FilterIndex == 2 || string.Equals(Path.GetExtension(dlg.FileName), ".pdf", StringComparison.OrdinalIgnoreCase))
-                ChatExportService.ExportPdf(dlg.FileName, _currentChat.Title, Messages);
-            else
-                ChatExportService.ExportWordRtf(dlg.FileName, _currentChat.Title, Messages);
+            ChatExportService.ExportByExtension(dlg.FileName, _currentChat.Title ?? "Чат", Messages);
 
             RuntimeStatusText.Text = "Чат экспортирован";
             MessageBox.Show($"Чат сохранён:\n{dlg.FileName}", "Экспорт завершён",
