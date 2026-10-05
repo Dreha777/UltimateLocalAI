@@ -8,6 +8,7 @@ public sealed class RagDocumentExtractor
     private readonly FileTextExtractor _fallback;
     private readonly PdfImportAnalyzer _pdfAnalyzer = new();
     private readonly PdfPageRenderer _pdfRenderer = new();
+    private readonly ScanRestorationService _scanRestoration = new();
 
     public RagDocumentExtractor(FileTextExtractor fallback)
     {
@@ -122,7 +123,35 @@ public sealed class RagDocumentExtractor
                     Math.Clamp(config.OcrDpi, 150, 450),
                     tempDir);
 
-                var recognized = await Task.Run(() => ocr.Recognize(image), ct);
+                OcrRecognitionResult recognized;
+                if (_configRestorationEnabled(config))
+                {
+                    var candidateDir = Path.Combine(tempDir, $"page-{page.PageNumber:D4}");
+                    var candidates = _scanRestoration.BuildCandidates(
+                        image,
+                        candidateDir,
+                        Math.Clamp(config.OcrMaxDeskewDegrees, 0, 20));
+
+                    var selection = await Task.Run(
+                        () => OcrCandidateSelector.SelectBest(ocr, candidates, ct),
+                        ct);
+
+                    recognized = selection.Recognition;
+                    page.RawOcrConfidence = selection.RawRecognition.Confidence;
+                    page.UsedRestoration = selection.Candidate.Processed;
+                    page.RestorationVariant = selection.Candidate.Name;
+                    page.DeskewDegrees = selection.Candidate.DeskewDegrees;
+                    page.RestorationScore = selection.Score;
+                }
+                else
+                {
+                    recognized = await Task.Run(() => ocr.Recognize(image), ct);
+                    page.RawOcrConfidence = recognized.Confidence;
+                    page.UsedRestoration = false;
+                    page.RestorationVariant = "Original";
+                    page.DeskewDegrees = 0;
+                }
+
                 page.UsedOcr = true;
                 page.OcrConfidence = recognized.Confidence;
                 report.OcrPageCount++;
@@ -149,7 +178,9 @@ public sealed class RagDocumentExtractor
                     {
                         PageNumber = page.PageNumber,
                         Content = ocrText,
-                        ExtractionMode = recognized.Confidence >= config.OcrMinConfidence ? "OCR" : "OCR-LowConfidence",
+                        ExtractionMode = recognized.Confidence >= config.OcrMinConfidence
+                            ? (page.UsedRestoration ? "OCR-Restored" : "OCR")
+                            : (page.UsedRestoration ? "OCR-Restored-LowConfidence" : "OCR-LowConfidence"),
                         OcrConfidence = recognized.Confidence
                     });
                 }
@@ -170,6 +201,9 @@ public sealed class RagDocumentExtractor
 
         return result;
     }
+
+    private static bool _configRestorationEnabled(AppConfig config) =>
+        config.OcrEnabled && config.OcrRestorationEnabled;
 
     private static List<RagSourceSegment> SplitTextIntoSegments(string text)
     {

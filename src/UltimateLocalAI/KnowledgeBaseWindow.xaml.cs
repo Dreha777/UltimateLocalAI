@@ -40,6 +40,8 @@ public partial class KnowledgeBaseWindow : Window
         OcrDpiBox.Text = _config.OcrDpi.ToString();
         OcrLanguagesBox.Text = _config.OcrLanguages;
         OcrConfidenceBox.Text = _config.OcrMinConfidence.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+        OcrRestorationBox.IsChecked = _config.OcrRestorationEnabled;
+        OcrMaxDeskewBox.Text = _config.OcrMaxDeskewDegrees.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
 
         Loaded += (_, _) => Refresh();
         Closing += (_, _) =>
@@ -96,6 +98,8 @@ public partial class KnowledgeBaseWindow : Window
         _config.OcrDpi = ParseInt(OcrDpiBox.Text, 300, 150, 450);
         _config.OcrLanguages = string.IsNullOrWhiteSpace(OcrLanguagesBox.Text) ? "rus+eng" : OcrLanguagesBox.Text.Trim();
         _config.OcrMinConfidence = ParseDouble(OcrConfidenceBox.Text, 0.45, 0, 1);
+        _config.OcrRestorationEnabled = OcrRestorationBox.IsChecked == true;
+        _config.OcrMaxDeskewDegrees = ParseDouble(OcrMaxDeskewBox.Text, 12.0, 0, 20);
         _configService.Save(_config);
     }
 
@@ -166,6 +170,8 @@ public partial class KnowledgeBaseWindow : Window
         OcrDpiBox.Text = _config.OcrDpi.ToString();
         OcrLanguagesBox.Text = _config.OcrLanguages;
         OcrConfidenceBox.Text = _config.OcrMinConfidence.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+        OcrRestorationBox.IsChecked = _config.OcrRestorationEnabled;
+        OcrMaxDeskewBox.Text = _config.OcrMaxDeskewDegrees.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
         Refresh();
     }
 

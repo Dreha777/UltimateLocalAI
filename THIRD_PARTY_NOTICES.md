@@ -65,6 +65,14 @@ Ultimate Local AI uses .NET 8 / WPF for the Windows graphical application and se
 - tessdata_best license: Apache-2.0
 - Purpose: fully local/offline OCR for scanned PDF pages. Language data are downloaded only during CI/build and are included in the resulting Portable/GUI patch; runtime OCR does not require Internet access.
 
+## OpenCvSharp / OpenCV
+
+- Package: OpenCvSharp4.Windows 4.13.0.20260627
+- OpenCvSharp license: Apache-2.0
+- OpenCV license: Apache-2.0
+- Purpose: fully local preprocessing of difficult scanned pages before OCR, including deskew, conservative cropping, background normalization, denoise, local contrast enhancement and thresholding.
+- The native OpenCV runtime is bundled in the Windows GUI/Portable package and does not require Internet access at runtime.
+
 ## CUDA / Vulkan
 
 The build system can use NVIDIA CUDA Toolkit and LunarG Vulkan SDK to compile GPU-enabled llama.cpp backends. These SDKs are governed by their own vendor license terms.

@@ -364,7 +364,9 @@ public sealed class RagVectorIndexService
             config.OcrEnabled,
             Math.Clamp(config.OcrDpi, 150, 450),
             Math.Clamp(config.OcrMinConfidence, 0.0, 1.0).ToString("0.000", System.Globalization.CultureInfo.InvariantCulture),
-            (config.OcrLanguages ?? "rus+eng").Trim().ToLowerInvariant());
+            (config.OcrLanguages ?? "rus+eng").Trim().ToLowerInvariant(),
+            config.OcrRestorationEnabled,
+            Math.Clamp(config.OcrMaxDeskewDegrees, 0, 20).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture));
     }
 
     private static string BuildEmbeddingFingerprint(string modelPath, string? documentPrefix, string? pooling)
