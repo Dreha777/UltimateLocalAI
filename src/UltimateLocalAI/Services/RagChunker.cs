@@ -24,6 +24,8 @@ public static class RagChunker
         int? pageFrom = null;
         int? pageTo = null;
         var section = "";
+        var extractionModes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var ocrConfidences = new List<double>();
 
         void Flush()
         {
@@ -44,6 +46,8 @@ public static class RagChunker
                 Section = section,
                 SourcePath = sourcePath,
                 Content = content,
+                ExtractionMode = ResolveExtractionMode(extractionModes),
+                OcrConfidence = ocrConfidences.Count == 0 ? 0 : ocrConfidences.Average(),
                 VectorIndex = result.Count
             });
 
@@ -53,6 +57,18 @@ public static class RagChunker
                 buffer.Append(overlap).AppendLine();
 
             pageFrom = pageTo;
+
+            var carriedMode = ResolveExtractionMode(extractionModes);
+            var carriedConfidence = ocrConfidences.Count == 0 ? 0 : ocrConfidences.Average();
+            extractionModes.Clear();
+            ocrConfidences.Clear();
+            if (!string.IsNullOrWhiteSpace(overlap))
+            {
+                if (!string.IsNullOrWhiteSpace(carriedMode))
+                    extractionModes.Add(carriedMode);
+                if (carriedConfidence > 0)
+                    ocrConfidences.Add(carriedConfidence);
+            }
         }
 
         foreach (var segment in segments)
@@ -69,6 +85,10 @@ public static class RagChunker
                 pageTo = segment.PageNumber;
             if (!string.IsNullOrWhiteSpace(segment.Section))
                 section = segment.Section;
+            if (!string.IsNullOrWhiteSpace(segment.ExtractionMode))
+                extractionModes.Add(segment.ExtractionMode);
+            if (segment.OcrConfidence > 0)
+                ocrConfidences.Add(segment.OcrConfidence);
 
             if (!string.IsNullOrWhiteSpace(segment.Section) &&
                 (buffer.Length == 0 || !buffer.ToString().Contains(segment.Section, StringComparison.Ordinal)))
@@ -99,6 +119,15 @@ public static class RagChunker
         Flush();
         nextChunkId = chunkId;
         return result;
+    }
+
+    private static string ResolveExtractionMode(IEnumerable<string> modes)
+    {
+        var set = modes.Where(x => !string.IsNullOrWhiteSpace(x)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (set.Count == 0) return "Text";
+        if (set.Any(x => x.Contains("LowConfidence", StringComparison.OrdinalIgnoreCase))) return "OCR-LowConfidence";
+        if (set.Count > 1) return "Mixed";
+        return set.First();
     }
 
     private static int FindBoundary(string text, int start, int take)

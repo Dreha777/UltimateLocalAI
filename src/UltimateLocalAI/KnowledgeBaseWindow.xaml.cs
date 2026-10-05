@@ -36,6 +36,10 @@ public partial class KnowledgeBaseWindow : Window
         UseRerankerBox.IsChecked = _config.UseReranker;
         CandidateTopKBox.Text = _config.RagCandidateTopK.ToString();
         FinalTopKBox.Text = _config.RagFinalTopK.ToString();
+        OcrEnabledBox.IsChecked = _config.OcrEnabled;
+        OcrDpiBox.Text = _config.OcrDpi.ToString();
+        OcrLanguagesBox.Text = _config.OcrLanguages;
+        OcrConfidenceBox.Text = _config.OcrMinConfidence.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
 
         Loaded += (_, _) => Refresh();
         Closing += (_, _) =>
@@ -67,6 +71,11 @@ public partial class KnowledgeBaseWindow : Window
         SelectEmbeddingButton.IsEnabled = !hasIndex;
         DocumentPrefixBox.IsEnabled = !hasIndex;
         PoolingBox.IsEnabled = !hasIndex;
+        if (LocalOcrSession.IsReady(_config.OcrLanguages, out var ocrReason))
+            OcrStatusText.Text = "OCR готов";
+        else
+            OcrStatusText.Text = "OCR не готов: " + ocrReason;
+
         var chatName = File.Exists(_config.ModelPath) ? Path.GetFileName(_config.ModelPath) : "не выбрана";
         ModelIndependenceText.Text = manifest.Documents.Count == 0
             ? $"Chat-модель: {chatName}. Индекс ещё пуст. После первой индексации embedding-модель фиксирует векторное пространство библиотеки."
@@ -83,6 +92,10 @@ public partial class KnowledgeBaseWindow : Window
         _config.UseReranker = UseRerankerBox.IsChecked == true;
         _config.RagCandidateTopK = ParseInt(CandidateTopKBox.Text, 24, 4, 100);
         _config.RagFinalTopK = ParseInt(FinalTopKBox.Text, 6, 1, Math.Min(20, _config.RagCandidateTopK));
+        _config.OcrEnabled = OcrEnabledBox.IsChecked == true;
+        _config.OcrDpi = ParseInt(OcrDpiBox.Text, 300, 150, 450);
+        _config.OcrLanguages = string.IsNullOrWhiteSpace(OcrLanguagesBox.Text) ? "rus+eng" : OcrLanguagesBox.Text.Trim();
+        _config.OcrMinConfidence = ParseDouble(OcrConfidenceBox.Text, 0.45, 0, 1);
         _configService.Save(_config);
     }
 
@@ -143,6 +156,19 @@ public partial class KnowledgeBaseWindow : Window
         StatusText.Text = $"Reranker выбран: {Path.GetFileName(dlg.FileName)}. Его можно менять без перестройки RAG-индекса.";
     }
 
+    private void PdfScanner_Click(object sender, RoutedEventArgs e)
+    {
+        SaveEmbeddingSettings();
+        var win = new PdfScannerWindow(_config, _configService) { Owner = this };
+        win.ShowDialog();
+
+        OcrEnabledBox.IsChecked = _config.OcrEnabled;
+        OcrDpiBox.Text = _config.OcrDpi.ToString();
+        OcrLanguagesBox.Text = _config.OcrLanguages;
+        OcrConfidenceBox.Text = _config.OcrMinConfidence.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+        Refresh();
+    }
+
     private async void Add_Click(object sender, RoutedEventArgs e)
     {
         SaveEmbeddingSettings();
@@ -185,11 +211,22 @@ public partial class KnowledgeBaseWindow : Window
         {
             await _ragService.IndexFilesAsync(dlg.FileNames, _config, _hardware, progress, _indexCts.Token);
 
-            // Until Stage 7G-2 switches chat retrieval to vectors, keep the old lexical
-            // index synchronized so existing "Использовать базу знаний" keeps working.
+            // Vector RAG is now authoritative for PDF, especially for OCR pages.
+            // The legacy lexical parser is kept only for non-PDF fallback so a scanned
+            // PDF can never pollute fallback search with a parser warning or binary-like text.
             foreach (var file in dlg.FileNames)
             {
                 _indexCts.Token.ThrowIfCancellationRequested();
+
+                if (Path.GetExtension(file).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+                {
+                    var legacyPdf = _legacyService.GetDocuments()
+                        .FirstOrDefault(x => string.Equals(x.SourcePath, Path.GetFullPath(file), StringComparison.OrdinalIgnoreCase));
+                    if (legacyPdf is not null)
+                        _legacyService.RemoveDocument(legacyPdf.Id);
+                    continue;
+                }
+
                 await _legacyService.IndexFileAsync(file);
             }
 
@@ -255,6 +292,14 @@ public partial class KnowledgeBaseWindow : Window
     private static int ParseInt(string? text, int fallback, int min, int max) =>
         int.TryParse(text, out var value) ? Math.Clamp(value, min, max) : Math.Clamp(fallback, min, max);
 
+    private static double ParseDouble(string? text, double fallback, double min, double max)
+    {
+        if (double.TryParse(text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value) ||
+            double.TryParse(text, out value))
+            return Math.Clamp(value, min, max);
+        return fallback;
+    }
+
     private static string SafeFullPath(string? path)
     {
         if (string.IsNullOrWhiteSpace(path)) return "";
@@ -280,5 +325,6 @@ public partial class KnowledgeBaseWindow : Window
         AddButton.IsEnabled = !busy;
         RemoveButton.IsEnabled = !busy;
         ClearButton.IsEnabled = !busy;
+        PdfScannerButton.IsEnabled = !busy;
     }
 }

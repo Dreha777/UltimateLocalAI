@@ -26,6 +26,10 @@ public sealed class AppConfig
     public bool UseReranker { get; set; } = true;
     public int RagCandidateTopK { get; set; } = 24;
     public int RagFinalTopK { get; set; } = 6;
+    public bool OcrEnabled { get; set; } = true;
+    public int OcrDpi { get; set; } = 300;
+    public double OcrMinConfidence { get; set; } = 0.45;
+    public string OcrLanguages { get; set; } = "rus+eng";
     public RuntimeSettings Runtime { get; set; } = new();
     public GenerationSettings Generation { get; set; } = new();
 }
@@ -132,6 +136,8 @@ public sealed class RagSourceCitation
     public double SemanticScore { get; set; }
     public double? RerankScore { get; set; }
     public string RetrievalMethod { get; set; } = "";
+    public string ExtractionMode { get; set; } = "";
+    public double OcrConfidence { get; set; }
 
     public string PageLabel => PageFrom.HasValue
         ? PageTo.HasValue && PageTo != PageFrom ? $"стр. {PageFrom}–{PageTo}" : $"стр. {PageFrom}"
@@ -271,6 +277,12 @@ public sealed class KnowledgeDocument
     public int ChunkCount { get; set; }
     public string IndexStatus { get; set; } = "";
     public string EmbeddingModelName { get; set; } = "";
+    public int OcrPageCount { get; set; }
+    public double OcrAverageConfidence { get; set; }
+    public string ImportMode { get; set; } = "";
+    public string ImportSummary => OcrPageCount > 0
+        ? $"{ImportMode} · OCR {OcrPageCount} стр. · {OcrAverageConfidence:P0}"
+        : string.IsNullOrWhiteSpace(ImportMode) ? "Text" : ImportMode;
 }
 
 public sealed class KnowledgeHit
@@ -285,6 +297,8 @@ public sealed class KnowledgeHit
     public double SemanticScore { get; set; }
     public double? RerankScore { get; set; }
     public string RetrievalMethod { get; set; } = "";
+    public string ExtractionMode { get; set; } = "";
+    public double OcrConfidence { get; set; }
     public string PageLabel => PageFrom.HasValue
         ? PageTo.HasValue && PageTo != PageFrom ? $"стр. {PageFrom}–{PageTo}" : $"стр. {PageFrom}"
         : "";
@@ -296,6 +310,8 @@ public sealed class RagSourceSegment
     public int? PageNumber { get; set; }
     public string Section { get; set; } = "";
     public string Content { get; set; } = "";
+    public string ExtractionMode { get; set; } = "Text";
+    public double OcrConfidence { get; set; }
 }
 
 public sealed class RagChunkRecord
@@ -308,6 +324,8 @@ public sealed class RagChunkRecord
     public string Section { get; set; } = "";
     public string SourcePath { get; set; } = "";
     public string Content { get; set; } = "";
+    public string ExtractionMode { get; set; } = "Text";
+    public double OcrConfidence { get; set; }
     public int VectorIndex { get; set; }
 }
 
@@ -319,11 +337,15 @@ public sealed class RagIndexedDocument
     public long SourceSizeBytes { get; set; }
     public DateTime SourceLastWriteUtc { get; set; }
     public string SourceSha256 { get; set; } = "";
+    public string ExtractionFingerprint { get; set; } = "";
     public int PageCount { get; set; }
     public int ChunkCount { get; set; }
     public string ChunkFile { get; set; } = "";
     public string VectorFile { get; set; } = "";
     public DateTime IndexedAt { get; set; }
+    public int OcrPageCount { get; set; }
+    public double OcrAverageConfidence { get; set; }
+    public string ImportMode { get; set; } = "";
 }
 
 public sealed class RagIndexManifest
@@ -366,4 +388,35 @@ public sealed class RagRetrievalResult
 {
     public List<KnowledgeHit> Hits { get; set; } = [];
     public RagRetrievalDiagnostics Diagnostics { get; set; } = new();
+}
+
+
+public sealed class PdfPageScanInfo
+{
+    public int PageNumber { get; set; }
+    public int TextCharCount { get; set; }
+    public double UsefulTextRatio { get; set; }
+    public string Mode { get; set; } = "Text";
+    public string Reason { get; set; } = "";
+    public string ExtractedText { get; set; } = "";
+    public double OcrConfidence { get; set; }
+    public bool UsedOcr { get; set; }
+}
+
+public sealed class PdfScanReport
+{
+    public string SourcePath { get; set; } = "";
+    public int PageCount { get; set; }
+    public int TextPageCount { get; set; }
+    public int OcrCandidatePageCount { get; set; }
+    public int OcrPageCount { get; set; }
+    public double OcrAverageConfidence { get; set; }
+    public string DocumentMode { get; set; } = "Text PDF";
+    public List<PdfPageScanInfo> Pages { get; set; } = [];
+}
+
+public sealed class RagExtractionResult
+{
+    public List<RagSourceSegment> Segments { get; set; } = [];
+    public PdfScanReport? PdfReport { get; set; }
 }

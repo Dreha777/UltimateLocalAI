@@ -1,0 +1,104 @@
+<Window x:Class="UltimateLocalAI.PdfScannerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Сканер PDF / OCR" Width="1080" Height="720" MinWidth="900" MinHeight="560"
+        WindowStartupLocation="CenterOwner" Background="{DynamicResource BgBrush}">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <TextBlock Text="Сканер PDF / OCR" FontSize="22" FontWeight="SemiBold"/>
+            <TextBlock Text="Проверяет каждую страницу: пригоден ли текстовый слой или нужен OCR. Подозрительные страницы рендерятся локально и распознаются Tesseract. Анализ не добавляет документ в RAG автоматически."
+                       Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,5,0,0"/>
+        </StackPanel>
+
+        <Border Grid.Row="1" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                CornerRadius="12" Padding="12" Margin="0,14,0,10">
+            <Grid>
+                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="PDF:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0"/>
+                <TextBox Grid.Column="1" x:Name="PdfPathBox" IsReadOnly="True"/>
+                <Button Grid.Column="3" Content="Выбрать…" Style="{StaticResource SoftButton}" Click="SelectPdf_Click"/>
+
+                <StackPanel Grid.Row="1" Grid.ColumnSpan="4" Orientation="Horizontal" Margin="0,10,0,0">
+                    <CheckBox x:Name="OcrEnabledBox" Content="OCR включён" VerticalAlignment="Center"/>
+                    <TextBlock Text="DPI:" Margin="18,0,5,0" VerticalAlignment="Center"/>
+                    <TextBox x:Name="DpiBox" Width="58"/>
+                    <TextBlock Text="Языки:" Margin="18,0,5,0" VerticalAlignment="Center"/>
+                    <TextBox x:Name="LanguagesBox" Width="90" ToolTip="Например: rus+eng"/>
+                    <TextBlock Text="Мин. confidence:" Margin="18,0,5,0" VerticalAlignment="Center"/>
+                    <TextBox x:Name="ConfidenceBox" Width="58"/>
+                    <Button x:Name="AnalyzeButton" Content="Анализировать" Style="{StaticResource AccentButton}" Margin="18,0,0,0" Click="Analyze_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="2" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="12">
+            <Grid>
+                <Grid.RowDefinitions><RowDefinition Height="36"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                <Grid Background="{DynamicResource ControlBrush}" Margin="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="65"/><ColumnDefinition Width="95"/><ColumnDefinition Width="90"/>
+                        <ColumnDefinition Width="110"/><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Стр." FontWeight="SemiBold" Margin="10,0" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Text="Режим" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="2" Text="Символы" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="3" Text="Text quality" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="4" Text="OCR confidence" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="5" Text="Почему" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                </Grid>
+
+                <ListBox Grid.Row="1" x:Name="PagesList" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+                            <Style.Triggers>
+                                <Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{DynamicResource AttachmentBrush}"/></Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid MinHeight="44">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="65"/><ColumnDefinition Width="95"/><ColumnDefinition Width="90"/>
+                                    <ColumnDefinition Width="110"/><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding PageNumber}" Margin="10,0" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="1" Text="{Binding Mode}" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="2" Text="{Binding TextCharCount}" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="3" Text="{Binding UsefulTextRatio, StringFormat={}{0:P0}}" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="4" Text="{Binding OcrConfidence, StringFormat={}{0:P0}}" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="5" Text="{Binding Reason}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,4,8,4"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="3" Margin="0,12,0,0">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="8"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock x:Name="SummaryText" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"/>
+                <TextBlock x:Name="StatusText" Foreground="{DynamicResource MutedBrush}" FontSize="10" Margin="0,3,0,0"/>
+            </StackPanel>
+            <Button Grid.Column="1" Content="Открыть страницу" Style="{StaticResource SoftButton}" Click="OpenPage_Click"/>
+            <Button Grid.Column="3" Content="Закрыть" Style="{StaticResource AccentButton}" Click="Close_Click"/>
+            <ProgressBar Grid.Row="1" Grid.ColumnSpan="4" x:Name="ProgressBar" Height="4" Margin="0,10,0,0" Visibility="Collapsed"/>
+        </Grid>
+    </Grid>
+</Window>

@@ -27,6 +27,12 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Prepare offline OCR assets
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy -Scope Process Bypass -Force
+          ./scripts/Prepare-OcrAssets.ps1
+
       - name: Restore GUI
         shell: pwsh
         run: dotnet restore src/UltimateLocalAI/UltimateLocalAI.csproj --configfile NuGet.config --ignore-failed-sources
@@ -34,6 +40,46 @@ jobs:
       - name: Build GUI
         shell: pwsh
         run: dotnet build src/UltimateLocalAI/UltimateLocalAI.csproj -c Release --no-restore -p:ContinuousIntegrationBuild=true
+
+      - name: Smoke-check local OCR and PDF native runtime
+        shell: pwsh
+        run: |
+          $releaseRoot = "src/UltimateLocalAI/bin/Release"
+          $dll = Get-ChildItem $releaseRoot -Recurse -Filter "UltimateLocalAI.dll" |
+            Where-Object { $_.FullName -notmatch "\\ref\\" } |
+            Select-Object -First 1
+          if (-not $dll) { throw "UltimateLocalAI.dll not found." }
+
+          $guiDir = Split-Path $dll.FullName -Parent
+          $tessDir = Join-Path $guiDir "Ocr\tessdata"
+          foreach ($lang in @("rus.traineddata", "eng.traineddata", "osd.traineddata")) {
+            $p = Join-Path $tessDir $lang
+            if (-not (Test-Path $p)) { throw "Missing OCR asset: $p" }
+            Write-Host "OK OCR asset: $p ($((Get-Item $p).Length) bytes)"
+          }
+
+          $tesseract = Join-Path $guiDir "x64\tesseract55.dll"
+          $leptonica = Join-Path $guiDir "x64\leptonica-1.85.0.dll"
+          $pdfium = Join-Path $guiDir "runtimes\win-x64\native\pdfium.dll"
+          foreach ($p in @($tesseract, $leptonica, $pdfium)) {
+            if (-not (Test-Path $p)) { throw "Missing native runtime: $p" }
+          }
+
+          $env:PATH = "$(Join-Path $guiDir 'x64');$(Join-Path $guiDir 'runtimes\win-x64\native');$env:PATH"
+          $handles = @()
+          try {
+            $handles += [System.Runtime.InteropServices.NativeLibrary]::Load($leptonica)
+            $handles += [System.Runtime.InteropServices.NativeLibrary]::Load($tesseract)
+            $handles += [System.Runtime.InteropServices.NativeLibrary]::Load($pdfium)
+            Write-Host "Native OCR/PDF libraries loaded successfully."
+          }
+          finally {
+            foreach ($h in $handles) {
+              if ($h -ne [IntPtr]::Zero) {
+                [System.Runtime.InteropServices.NativeLibrary]::Free($h)
+              }
+            }
+          }
 
       - name: Prepare GUI patch
         shell: pwsh
@@ -63,6 +109,13 @@ jobs:
 
           if (Test-Path (Join-Path $guiDir "runtimes")) {
             Copy-Item (Join-Path $guiDir "runtimes") (Join-Path $patchDir "runtimes") -Recurse -Force
+          }
+
+          foreach ($dirName in @("Ocr", "x64", "x86", "arm64")) {
+            $sourceDir = Join-Path $guiDir $dirName
+            if (Test-Path $sourceDir) {
+              Copy-Item $sourceDir (Join-Path $patchDir $dirName) -Recurse -Force
+            }
           }
 
           foreach ($doc in @("FIRST_START_RU.txt", "USER_GUIDE_RU.txt", "THIRD_PARTY_NOTICES.md")) {
@@ -135,6 +188,12 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
+      - name: Prepare offline OCR assets
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy -Scope Process Bypass -Force
+          ./scripts/Prepare-OcrAssets.ps1
 
       - name: Install Vulkan SDK
         shell: pwsh

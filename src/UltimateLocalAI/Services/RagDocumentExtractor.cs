@@ -1,66 +1,179 @@
 using System.Text.RegularExpressions;
 using UltimateLocalAI.Models;
-using UglyToad.PdfPig;
-using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
 
 namespace UltimateLocalAI.Services;
 
 public sealed class RagDocumentExtractor
 {
     private readonly FileTextExtractor _fallback;
+    private readonly PdfImportAnalyzer _pdfAnalyzer = new();
+    private readonly PdfPageRenderer _pdfRenderer = new();
 
     public RagDocumentExtractor(FileTextExtractor fallback)
     {
         _fallback = fallback;
     }
 
-    public async Task<List<RagSourceSegment>> ExtractAsync(string path, CancellationToken ct = default)
+    public async Task<RagExtractionResult> ExtractAsync(
+        string path,
+        AppConfig config,
+        IProgress<RagIndexProgress>? progress = null,
+        CancellationToken ct = default)
     {
         if (!File.Exists(path))
             throw new FileNotFoundException("Файл не найден.", path);
 
         if (Path.GetExtension(path).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
-            return await Task.Run(() => ExtractPdf(path, ct), ct);
+            return await ExtractPdfAsync(path, config, progress, ct);
 
         var attachment = await _fallback.ExtractAsync(path);
         ct.ThrowIfCancellationRequested();
-        return SplitTextIntoSegments(attachment.ExtractedText);
+        return new RagExtractionResult
+        {
+            Segments = SplitTextIntoSegments(attachment.ExtractedText)
+        };
     }
 
-    private static List<RagSourceSegment> ExtractPdf(string path, CancellationToken ct)
+    private async Task<RagExtractionResult> ExtractPdfAsync(
+        string path,
+        AppConfig config,
+        IProgress<RagIndexProgress>? progress,
+        CancellationToken ct)
     {
-        var result = new List<RagSourceSegment>();
-        using var document = PdfDocument.Open(path);
-
-        foreach (var page in document.GetPages())
+        progress?.Report(new RagIndexProgress
         {
-            ct.ThrowIfCancellationRequested();
-            var text = Normalize(ContentOrderTextExtractor.GetText(page));
-            if (string.IsNullOrWhiteSpace(text))
-                continue;
+            Phase = "pdf-analyze",
+            FileName = Path.GetFileName(path),
+            Message = "Анализ текстового слоя PDF…"
+        });
 
-            result.Add(new RagSourceSegment
+        var report = await _pdfAnalyzer.AnalyzeAsync(path, ct);
+        var result = new RagExtractionResult { PdfReport = report };
+
+        if (report.OcrCandidatePageCount == 0)
+        {
+            foreach (var page in report.Pages)
             {
-                PageNumber = page.Number,
-                Section = "",
-                Content = text
-            });
+                if (string.IsNullOrWhiteSpace(page.ExtractedText)) continue;
+                result.Segments.Add(new RagSourceSegment
+                {
+                    PageNumber = page.PageNumber,
+                    Content = page.ExtractedText,
+                    ExtractionMode = "Text"
+                });
+            }
+            return result;
         }
 
-        if (result.Count == 0)
+        if (!config.OcrEnabled)
         {
-            result.Add(new RagSourceSegment
+            foreach (var page in report.Pages)
             {
-                Content = "[PDF не содержит надёжно извлекаемого текстового слоя. Для него потребуется OCR-режим Stage 7G-4/7G-5.]"
-            });
+                if (string.IsNullOrWhiteSpace(page.ExtractedText)) continue;
+                result.Segments.Add(new RagSourceSegment
+                {
+                    PageNumber = page.PageNumber,
+                    Content = page.ExtractedText,
+                    ExtractionMode = page.Mode == "Text" ? "Text" : "WeakText"
+                });
+            }
+            return result;
         }
+
+        if (!LocalOcrSession.IsReady(config.OcrLanguages, out var ocrReason))
+            throw new InvalidOperationException(
+                $"PDF содержит {report.OcrCandidatePageCount} страниц, которым нужен OCR, но OCR-движок не готов: {ocrReason}");
+
+        var tempDir = Path.Combine(AppPaths.TempDir, "ocr-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+
+        var confidences = new List<double>();
+        try
+        {
+            using var ocr = new LocalOcrSession(config.OcrLanguages);
+
+            foreach (var page in report.Pages)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                if (page.Mode == "Text")
+                {
+                    result.Segments.Add(new RagSourceSegment
+                    {
+                        PageNumber = page.PageNumber,
+                        Content = page.ExtractedText,
+                        ExtractionMode = "Text"
+                    });
+                    continue;
+                }
+
+                progress?.Report(new RagIndexProgress
+                {
+                    Phase = "ocr",
+                    FileName = Path.GetFileName(path),
+                    Completed = page.PageNumber,
+                    Total = report.PageCount,
+                    Message = $"OCR страницы {page.PageNumber}/{report.PageCount}…"
+                });
+
+                var image = _pdfRenderer.RenderPageToPng(
+                    path,
+                    page.PageNumber,
+                    Math.Clamp(config.OcrDpi, 150, 450),
+                    tempDir);
+
+                var recognized = await Task.Run(() => ocr.Recognize(image), ct);
+                page.UsedOcr = true;
+                page.OcrConfidence = recognized.Confidence;
+                report.OcrPageCount++;
+                confidences.Add(recognized.Confidence);
+
+                var ocrText = PdfImportAnalyzer.Normalize(recognized.Text);
+                var useOcr = ocrText.Count(char.IsLetterOrDigit) >= 20;
+
+                if (!useOcr && !string.IsNullOrWhiteSpace(page.ExtractedText))
+                {
+                    result.Segments.Add(new RagSourceSegment
+                    {
+                        PageNumber = page.PageNumber,
+                        Content = page.ExtractedText,
+                        ExtractionMode = "WeakText",
+                        OcrConfidence = recognized.Confidence
+                    });
+                    continue;
+                }
+
+                if (!string.IsNullOrWhiteSpace(ocrText))
+                {
+                    result.Segments.Add(new RagSourceSegment
+                    {
+                        PageNumber = page.PageNumber,
+                        Content = ocrText,
+                        ExtractionMode = recognized.Confidence >= config.OcrMinConfidence ? "OCR" : "OCR-LowConfidence",
+                        OcrConfidence = recognized.Confidence
+                    });
+                }
+            }
+        }
+        finally
+        {
+            try { Directory.Delete(tempDir, recursive: true); } catch { }
+        }
+
+        report.OcrAverageConfidence = confidences.Count == 0 ? 0 : confidences.Average();
+        report.DocumentMode = report.OcrPageCount switch
+        {
+            0 => report.DocumentMode,
+            _ when report.TextPageCount == 0 => "OCR scan",
+            _ => "Mixed text + OCR"
+        };
 
         return result;
     }
 
     private static List<RagSourceSegment> SplitTextIntoSegments(string text)
     {
-        var normalized = Normalize(text);
+        var normalized = PdfImportAnalyzer.Normalize(text);
         if (string.IsNullOrWhiteSpace(normalized))
             return [];
 
@@ -84,12 +197,13 @@ public sealed class RagDocumentExtractor
             {
                 PageNumber = null,
                 Section = currentSection,
-                Content = paragraph
+                Content = paragraph,
+                ExtractionMode = "Text"
             });
         }
 
         if (result.Count == 0)
-            result.Add(new RagSourceSegment { Content = normalized });
+            result.Add(new RagSourceSegment { Content = normalized, ExtractionMode = "Text" });
 
         return result;
     }
@@ -108,14 +222,5 @@ public sealed class RagDocumentExtractor
         if (letters < 3) return false;
         var upper = trimmed.Count(char.IsUpper);
         return upper >= letters * 0.8;
-    }
-
-    private static string Normalize(string? text)
-    {
-        if (string.IsNullOrWhiteSpace(text)) return "";
-        var value = text.Replace("\r\n", "\n").Replace('\r', '\n');
-        value = Regex.Replace(value, @"[ \t]+", " ");
-        value = Regex.Replace(value, @"\n{3,}", "\n\n");
-        return value.Trim();
     }
 }

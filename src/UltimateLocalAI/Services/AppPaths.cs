@@ -12,6 +12,9 @@ public static class AppPaths
     public static string RagIndexDir => Path.Combine(DataDir, "RagIndex");
     public static string RagManifestFile => Path.Combine(RagIndexDir, "manifest.json");
     public static string TempDir => Path.Combine(DataDir, "Temp");
+    public static string OcrDir => Path.Combine(BaseDir, "Ocr");
+    public static string OcrTessdataDir => Path.Combine(OcrDir, "tessdata");
+    public static string OcrCacheDir => Path.Combine(DataDir, "OcrCache");
     public static string BackupsDir => Path.Combine(DataDir, "Backups");
 
     public static string ResolveBackendsDir(string runtimeChannel, string? customRuntimePath)
@@ -33,5 +36,8 @@ public static class AppPaths
         Directory.CreateDirectory(TempDir);
         Directory.CreateDirectory(BackupsDir);
         Directory.CreateDirectory(RagIndexDir);
+        Directory.CreateDirectory(OcrDir);
+        Directory.CreateDirectory(OcrTessdataDir);
+        Directory.CreateDirectory(OcrCacheDir);
     }
 }

@@ -655,7 +655,9 @@ public partial class MainWindow : Window
                         Snippet = body,
                         SemanticScore = hit.SemanticScore,
                         RerankScore = hit.RerankScore,
-                        RetrievalMethod = hit.RetrievalMethod
+                        RetrievalMethod = hit.RetrievalMethod,
+                        ExtractionMode = hit.ExtractionMode,
+                        OcrConfidence = hit.OcrConfidence
                     });
                 }
 
@@ -1072,7 +1074,9 @@ public partial class MainWindow : Window
         Snippet = source.Snippet,
         SemanticScore = source.SemanticScore,
         RerankScore = source.RerankScore,
-        RetrievalMethod = source.RetrievalMethod
+        RetrievalMethod = source.RetrievalMethod,
+        ExtractionMode = source.ExtractionMode,
+        OcrConfidence = source.OcrConfidence
     };
 
     private void PromptBox_PreviewKeyDown(object sender, KeyEventArgs e)
