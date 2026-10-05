@@ -32,7 +32,14 @@ Ultimate Local AI uses .NET 8 / WPF for the Windows graphical application and se
 - Package: PDFsharp-MigraDoc-WPF 6.2.4
 - Project: PDFsharp / MigraDoc
 - License: MIT
-- Purpose: local export of chat history to PDF and Word-compatible RTF.
+- Purpose: local export of chat history to PDF and Word-compatible RTF; PDF rendering uses Windows font resolution with a local fallback.
+
+## Open XML SDK
+
+- Package: DocumentFormat.OpenXml 3.5.1
+- Project: Open XML SDK
+- License: MIT
+- Purpose: creation of native Microsoft Word DOCX chat exports without requiring Microsoft Office.
 
 ## CUDA / Vulkan
 
