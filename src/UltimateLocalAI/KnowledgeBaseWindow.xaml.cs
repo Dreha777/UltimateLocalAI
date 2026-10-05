@@ -211,11 +211,22 @@ public partial class KnowledgeBaseWindow : Window
         {
             await _ragService.IndexFilesAsync(dlg.FileNames, _config, _hardware, progress, _indexCts.Token);
 
-            // Until Stage 7G-2 switches chat retrieval to vectors, keep the old lexical
-            // index synchronized so existing "Использовать базу знаний" keeps working.
+            // Vector RAG is now authoritative for PDF, especially for OCR pages.
+            // The legacy lexical parser is kept only for non-PDF fallback so a scanned
+            // PDF can never pollute fallback search with a parser warning or binary-like text.
             foreach (var file in dlg.FileNames)
             {
                 _indexCts.Token.ThrowIfCancellationRequested();
+
+                if (Path.GetExtension(file).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+                {
+                    var legacyPdf = _legacyService.GetDocuments()
+                        .FirstOrDefault(x => string.Equals(x.SourcePath, Path.GetFullPath(file), StringComparison.OrdinalIgnoreCase));
+                    if (legacyPdf is not null)
+                        _legacyService.RemoveDocument(legacyPdf.Id);
+                    continue;
+                }
+
                 await _legacyService.IndexFileAsync(file);
             }
 
