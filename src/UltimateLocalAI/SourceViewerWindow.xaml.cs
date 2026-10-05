@@ -26,7 +26,9 @@ public partial class SourceViewerWindow : Window
         var rerank = source.RerankScore.HasValue && double.IsFinite(source.RerankScore.Value)
             ? $" · rerank={source.RerankScore.Value:0.0000}"
             : "";
-        DiagnosticsText.Text = $"Поиск: {source.RetrievalMethod} · {semantic}{rerank}";
+        var extraction = string.IsNullOrWhiteSpace(source.ExtractionMode) ? "" : $" · извлечение={source.ExtractionMode}";
+        var ocr = source.OcrConfidence > 0 ? $" · OCR={source.OcrConfidence:P0}" : "";
+        DiagnosticsText.Text = $"Поиск: {source.RetrievalMethod} · {semantic}{rerank}{extraction}{ocr}";
     }
 
     private void OpenSource_Click(object sender, RoutedEventArgs e)
