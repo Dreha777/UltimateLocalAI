@@ -53,6 +53,7 @@ public sealed class RagRetrievalService
         var queryInput = (config.EmbeddingQueryPrefix ?? "") + query.Trim();
         var queryVectors = await _embeddingClient.EmbedAsync(config.EmbeddingPort, [queryInput], ct);
         var queryVector = queryVectors[0];
+        await embeddingServer.StopAsync();
 
         if (queryVector.Length != manifest.VectorDimensions)
             throw new InvalidDataException(
