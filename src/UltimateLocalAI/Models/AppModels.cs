@@ -133,6 +133,23 @@ public sealed class HardwareInfo
     public string ShortSummary => $"{CpuName}\nRAM: {TotalRamMb / 1024.0:0.#} ГБ · AVX {(Avx ? "✓" : "✗")} · AVX2 {(Avx2 ? "✓" : "✗")}\nGPU: {GpuName}";
 }
 
+public sealed class ModelServerProperties
+{
+    public string ModelAlias { get; set; } = "";
+    public string ModelFtype { get; set; } = "";
+    public int ContextSize { get; set; }
+    public string ChatTemplate { get; set; } = "";
+    public List<string> ChatTemplateCapabilities { get; set; } = [];
+
+    public bool HasChatTemplate => !string.IsNullOrWhiteSpace(ChatTemplate);
+
+    public bool SupportsReasoning =>
+        ChatTemplateCapabilities.Any(x => x.Contains("reason", StringComparison.OrdinalIgnoreCase) ||
+                                          x.Contains("think", StringComparison.OrdinalIgnoreCase)) ||
+        ChatTemplate.Contains("reasoning", StringComparison.OrdinalIgnoreCase) ||
+        ChatTemplate.Contains("think", StringComparison.OrdinalIgnoreCase);
+}
+
 public sealed class BackendChoice
 {
     public string Name { get; set; } = "";
