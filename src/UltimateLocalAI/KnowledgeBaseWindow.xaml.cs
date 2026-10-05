@@ -50,11 +50,23 @@ public partial class KnowledgeBaseWindow : Window
         DocsList.ItemsSource = _ragService.GetDocuments();
         var manifest = _ragService.GetManifest();
 
+        var hasIndex = manifest.Documents.Count > 0;
         var model = string.IsNullOrWhiteSpace(manifest.EmbeddingModelName)
             ? "embedding-модель ещё не зафиксирована"
             : manifest.EmbeddingModelName;
         var dims = manifest.VectorDimensions > 0 ? $" · {manifest.VectorDimensions} dim" : "";
         IndexInfoText.Text = $"Документов: {manifest.Documents.Count} · embedding индекса: {model}{dims}";
+
+        if (hasIndex)
+        {
+            EmbeddingModelPathBox.Text = manifest.EmbeddingModelPath;
+            DocumentPrefixBox.Text = manifest.EmbeddingDocumentPrefix;
+            SelectComboByText(PoolingBox, manifest.EmbeddingPooling);
+        }
+
+        SelectEmbeddingButton.IsEnabled = !hasIndex;
+        DocumentPrefixBox.IsEnabled = !hasIndex;
+        PoolingBox.IsEnabled = !hasIndex;
         var chatName = File.Exists(_config.ModelPath) ? Path.GetFileName(_config.ModelPath) : "не выбрана";
         ModelIndependenceText.Text = manifest.Documents.Count == 0
             ? $"Chat-модель: {chatName}. Индекс ещё пуст. После первой индексации embedding-модель фиксирует векторное пространство библиотеки."
@@ -90,22 +102,23 @@ public partial class KnowledgeBaseWindow : Window
         if (dlg.ShowDialog(this) != true)
             return;
 
+        var manifest = _ragService.GetManifest();
+        if (manifest.Documents.Count > 0)
+        {
+            MessageBox.Show(
+                "Embedding-модель уже зафиксирована существующим RAG-индексом. Chat-модель и reranker можно менять свободно. Для смены embedding-модели сначала очистите RAG-индекс, затем выберите новую модель и переиндексируйте документы.",
+                "RAG: embedding-модель зафиксирована", MessageBoxButton.OK, MessageBoxImage.Information);
+            Refresh();
+            return;
+        }
+
         EmbeddingModelPathBox.Text = dlg.FileName;
         SaveEmbeddingSettings();
 
-        var manifest = _ragService.GetManifest();
-        if (manifest.Documents.Count > 0 &&
-            !string.Equals(Path.GetFullPath(dlg.FileName), SafeFullPath(manifest.EmbeddingModelPath), StringComparison.OrdinalIgnoreCase))
-        {
-            StatusText.Text = "Выбрана другая embedding-модель, но существующая библиотека продолжит использовать модель из manifest до полной перестройки.";
-        }
-        else
-        {
-            var meta = GgufMetadataReader.Read(dlg.FileName);
-            StatusText.Text = meta.IsValid
-                ? $"Embedding GGUF выбрана: {Path.GetFileName(dlg.FileName)} · {meta.Architecture} · {meta.Quantization}"
-                : $"Embedding GGUF выбрана: {Path.GetFileName(dlg.FileName)}";
-        }
+        var meta = GgufMetadataReader.Read(dlg.FileName);
+        StatusText.Text = meta.IsValid
+            ? $"Embedding GGUF выбрана: {Path.GetFileName(dlg.FileName)} · {meta.Architecture} · {meta.Quantization}"
+            : $"Embedding GGUF выбрана: {Path.GetFileName(dlg.FileName)}";
     }
 
     private void SelectRerankerModel_Click(object sender, RoutedEventArgs e)
