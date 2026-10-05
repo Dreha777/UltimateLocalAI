@@ -9,14 +9,16 @@ public partial class PdfScannerWindow : Window
 {
     private readonly AppConfig _config;
     private readonly ConfigService _configService;
+    private readonly HardwareInfo _hardware;
     private readonly RagDocumentExtractor _extractor = new(new FileTextExtractor());
     private CancellationTokenSource? _cts;
 
-    public PdfScannerWindow(AppConfig config, ConfigService configService)
+    public PdfScannerWindow(AppConfig config, ConfigService configService, HardwareInfo hardware)
     {
         InitializeComponent();
         _config = config;
         _configService = configService;
+        _hardware = hardware;
 
         OcrEnabledBox.IsChecked = _config.OcrEnabled;
         DpiBox.Text = _config.OcrDpi.ToString();
@@ -132,6 +134,40 @@ public partial class PdfScannerWindow : Window
 
         SaveSettings();
         var win = new PdfRestorationPreviewWindow(PdfPathBox.Text, page.PageNumber, _config)
+        {
+            Owner = this
+        };
+        win.ShowDialog();
+    }
+
+    private void PreviewVision_Click(object sender, RoutedEventArgs e)
+    {
+        if (PagesList.SelectedItem is not PdfPageScanInfo page || !File.Exists(PdfPathBox.Text))
+        {
+            MessageBox.Show(
+                "Сначала выберите проанализированную страницу.",
+                "Document Vision", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        SaveSettings();
+
+        if (!_config.DocumentVisionEnabled ||
+            !File.Exists(_config.DocumentVisionModelPath) ||
+            !File.Exists(_config.DocumentVisionMmprojPath))
+        {
+            MessageBox.Show(
+                "Сначала настройте Vision GGUF и соответствующий mmproj в окне «База знаний».",
+                "Document Vision", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var win = new DocumentVisionPreviewWindow(
+            PdfPathBox.Text,
+            page.PageNumber,
+            page.ExtractedText,
+            _config,
+            _hardware)
         {
             Owner = this
         };
