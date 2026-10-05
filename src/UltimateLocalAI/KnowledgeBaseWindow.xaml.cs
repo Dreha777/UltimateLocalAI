@@ -32,8 +32,16 @@ public partial class KnowledgeBaseWindow : Window
         DocumentPrefixBox.Text = _config.EmbeddingDocumentPrefix;
         QueryPrefixBox.Text = _config.EmbeddingQueryPrefix;
         SelectComboByText(PoolingBox, _config.EmbeddingPooling);
+        RerankerModelPathBox.Text = _config.RerankerModelPath;
+        UseRerankerBox.IsChecked = _config.UseReranker;
+        CandidateTopKBox.Text = _config.RagCandidateTopK.ToString();
+        FinalTopKBox.Text = _config.RagFinalTopK.ToString();
 
         Loaded += (_, _) => Refresh();
+        Closing += (_, _) =>
+        {
+            try { SaveEmbeddingSettings(); } catch { }
+        };
         Closed += (_, _) => _indexCts?.Cancel();
     }
 
@@ -42,11 +50,27 @@ public partial class KnowledgeBaseWindow : Window
         DocsList.ItemsSource = _ragService.GetDocuments();
         var manifest = _ragService.GetManifest();
 
+        var hasIndex = manifest.Documents.Count > 0;
         var model = string.IsNullOrWhiteSpace(manifest.EmbeddingModelName)
             ? "embedding-модель ещё не зафиксирована"
             : manifest.EmbeddingModelName;
         var dims = manifest.VectorDimensions > 0 ? $" · {manifest.VectorDimensions} dim" : "";
-        IndexInfoText.Text = $"Документов: {manifest.Documents.Count} · {model}{dims}";
+        IndexInfoText.Text = $"Документов: {manifest.Documents.Count} · embedding индекса: {model}{dims}";
+
+        if (hasIndex)
+        {
+            EmbeddingModelPathBox.Text = manifest.EmbeddingModelPath;
+            DocumentPrefixBox.Text = manifest.EmbeddingDocumentPrefix;
+            SelectComboByText(PoolingBox, manifest.EmbeddingPooling);
+        }
+
+        SelectEmbeddingButton.IsEnabled = !hasIndex;
+        DocumentPrefixBox.IsEnabled = !hasIndex;
+        PoolingBox.IsEnabled = !hasIndex;
+        var chatName = File.Exists(_config.ModelPath) ? Path.GetFileName(_config.ModelPath) : "не выбрана";
+        ModelIndependenceText.Text = manifest.Documents.Count == 0
+            ? $"Chat-модель: {chatName}. Индекс ещё пуст. После первой индексации embedding-модель фиксирует векторное пространство библиотеки."
+            : $"Chat-модель: {chatName} — её можно менять свободно. Библиотека создана embedding-моделью «{manifest.EmbeddingModelName}» и остаётся с ней. Reranker тоже можно менять без переиндексации. Только смена embedding-модели, document prefix или pooling требует перестроить индекс.";
     }
 
     private void SaveEmbeddingSettings()
@@ -55,6 +79,10 @@ public partial class KnowledgeBaseWindow : Window
         _config.EmbeddingDocumentPrefix = DocumentPrefixBox.Text;
         _config.EmbeddingQueryPrefix = QueryPrefixBox.Text;
         _config.EmbeddingPooling = (PoolingBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString() ?? "Auto";
+        _config.RerankerModelPath = RerankerModelPathBox.Text.Trim();
+        _config.UseReranker = UseRerankerBox.IsChecked == true;
+        _config.RagCandidateTopK = ParseInt(CandidateTopKBox.Text, 24, 4, 100);
+        _config.RagFinalTopK = ParseInt(FinalTopKBox.Text, 6, 1, Math.Min(20, _config.RagCandidateTopK));
         _configService.Save(_config);
     }
 
@@ -74,6 +102,16 @@ public partial class KnowledgeBaseWindow : Window
         if (dlg.ShowDialog(this) != true)
             return;
 
+        var manifest = _ragService.GetManifest();
+        if (manifest.Documents.Count > 0)
+        {
+            MessageBox.Show(
+                "Embedding-модель уже зафиксирована существующим RAG-индексом. Chat-модель и reranker можно менять свободно. Для смены embedding-модели сначала очистите RAG-индекс, затем выберите новую модель и переиндексируйте документы.",
+                "RAG: embedding-модель зафиксирована", MessageBoxButton.OK, MessageBoxImage.Information);
+            Refresh();
+            return;
+        }
+
         EmbeddingModelPathBox.Text = dlg.FileName;
         SaveEmbeddingSettings();
 
@@ -81,6 +119,28 @@ public partial class KnowledgeBaseWindow : Window
         StatusText.Text = meta.IsValid
             ? $"Embedding GGUF выбрана: {Path.GetFileName(dlg.FileName)} · {meta.Architecture} · {meta.Quantization}"
             : $"Embedding GGUF выбрана: {Path.GetFileName(dlg.FileName)}";
+    }
+
+    private void SelectRerankerModel_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFileDialog
+        {
+            Filter = "GGUF reranker-модель (*.gguf)|*.gguf|Все файлы (*.*)|*.*",
+            Title = "Выберите GGUF reranker-модель"
+        };
+
+        if (File.Exists(_config.RerankerModelPath))
+            dlg.InitialDirectory = Path.GetDirectoryName(_config.RerankerModelPath);
+        else if (File.Exists(_config.EmbeddingModelPath))
+            dlg.InitialDirectory = Path.GetDirectoryName(_config.EmbeddingModelPath);
+
+        if (dlg.ShowDialog(this) != true)
+            return;
+
+        RerankerModelPathBox.Text = dlg.FileName;
+        UseRerankerBox.IsChecked = true;
+        SaveEmbeddingSettings();
+        StatusText.Text = $"Reranker выбран: {Path.GetFileName(dlg.FileName)}. Его можно менять без перестройки RAG-индекса.";
     }
 
     private async void Add_Click(object sender, RoutedEventArgs e)
@@ -133,7 +193,7 @@ public partial class KnowledgeBaseWindow : Window
                 await _legacyService.IndexFileAsync(file);
             }
 
-            StatusText.Text = "Векторный индекс построен. Semantic retrieval будет подключён в Stage 7G-2.";
+            StatusText.Text = "Векторный индекс построен. Semantic retrieval активен при включённой базе знаний.";
             Refresh();
         }
         catch (OperationCanceledException)
@@ -190,6 +250,16 @@ public partial class KnowledgeBaseWindow : Window
         {
             SetBusy(false);
         }
+    }
+
+    private static int ParseInt(string? text, int fallback, int min, int max) =>
+        int.TryParse(text, out var value) ? Math.Clamp(value, min, max) : Math.Clamp(fallback, min, max);
+
+    private static string SafeFullPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return "";
+        try { return Path.GetFullPath(path); }
+        catch { return path; }
     }
 
     private static void SelectComboByText(System.Windows.Controls.ComboBox box, string? text)
