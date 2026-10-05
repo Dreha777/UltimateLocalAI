@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     private readonly LlamaApiClient _api = new();
     private readonly FileTextExtractor _extractor = new();
     private readonly KnowledgeBaseService _knowledge;
+    private readonly RagVectorIndexService _ragIndex;
     private readonly ResourceMonitorService _resourceMonitor = new();
     private readonly System.Windows.Threading.DispatcherTimer _resourceTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private bool _resourceRefreshBusy;
@@ -55,6 +56,7 @@ public partial class MainWindow : Window
         _config.Runtime.AutoProfile = NormalizeAutoProfile(_config.Runtime.AutoProfile);
         _activeContextSize = Math.Max(512, _config.Runtime.ContextSize);
         _knowledge = new KnowledgeBaseService(_extractor);
+        _ragIndex = new RagVectorIndexService(_extractor, _backendSelector);
         _server.StatusChanged += s => Dispatcher.Invoke(() =>
         {
             RuntimeStatusText.Text = s;
@@ -1277,7 +1279,7 @@ public partial class MainWindow : Window
 
     private void Knowledge_Click(object sender, RoutedEventArgs e)
     {
-        var win = new KnowledgeBaseWindow(_knowledge) { Owner = this };
+        var win = new KnowledgeBaseWindow(_knowledge, _ragIndex, _config, _configService, _hardware) { Owner = this };
         win.ShowDialog();
     }
 
