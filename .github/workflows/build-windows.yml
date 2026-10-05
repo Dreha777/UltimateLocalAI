@@ -62,17 +62,20 @@ jobs:
           $tesseract = Join-Path $guiDir "x64\tesseract55.dll"
           $leptonica = Join-Path $guiDir "x64\leptonica-1.85.0.dll"
           $pdfium = Join-Path $guiDir "runtimes\win-x64\native\pdfium.dll"
+          $opencv = Get-ChildItem $guiDir -Recurse -Filter "OpenCvSharpExtern.dll" | Select-Object -First 1
           foreach ($p in @($tesseract, $leptonica, $pdfium)) {
             if (-not (Test-Path $p)) { throw "Missing native runtime: $p" }
           }
+          if (-not $opencv) { throw "Missing native runtime: OpenCvSharpExtern.dll" }
 
-          $env:PATH = "$(Join-Path $guiDir 'x64');$(Join-Path $guiDir 'runtimes\win-x64\native');$env:PATH"
+          $env:PATH = "$($opencv.DirectoryName);$(Join-Path $guiDir 'x64');$(Join-Path $guiDir 'runtimes\win-x64\native');$env:PATH"
           $handles = @()
           try {
             $handles += [System.Runtime.InteropServices.NativeLibrary]::Load($leptonica)
             $handles += [System.Runtime.InteropServices.NativeLibrary]::Load($tesseract)
             $handles += [System.Runtime.InteropServices.NativeLibrary]::Load($pdfium)
-            Write-Host "Native OCR/PDF libraries loaded successfully."
+            $handles += [System.Runtime.InteropServices.NativeLibrary]::Load($opencv.FullName)
+            Write-Host "Native OCR/PDF/OpenCV libraries loaded successfully."
           }
           finally {
             foreach ($h in $handles) {
