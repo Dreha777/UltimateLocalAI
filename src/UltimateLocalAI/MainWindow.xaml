@@ -108,7 +108,7 @@
                         <Button Style="{StaticResource SoftButton}" Content="Выбрать GGUF" Click="SelectModel_Click" Margin="0,0,8,0"/>
                         <Button x:Name="StartButton" Style="{StaticResource AccentButton}" Content="Запустить" Click="StartModel_Click" Margin="0,0,8,0"/>
                         <Button x:Name="UnloadButton" Style="{StaticResource SoftButton}" Content="Выгрузить" Click="UnloadModel_Click" IsEnabled="False" Margin="0,0,8,0" ToolTip="Остановить llama-server и освободить RAM/VRAM"/>
-                        <Button Style="{StaticResource SoftButton}" Content="Экспорт" Click="ExportChat_Click" Margin="0,0,8,0" ToolTip="Экспорт текущего чата в Word/RTF или PDF"/>
+                        <Button Style="{StaticResource SoftButton}" Content="Экспорт" Click="ExportChat_Click" Margin="0,0,8,0" ToolTip="Экспорт: DOCX, PDF, RTF, TXT, Markdown, HTML или JSON"/>
                         <Button Style="{StaticResource SoftButton}" Content="⚙" FontSize="17" Width="42" Click="Settings_Click" ToolTip="Настройки модели"/>
                     </StackPanel>
                     <ProgressBar x:Name="ModelLoadProgress" Grid.Row="1" Grid.ColumnSpan="2"
