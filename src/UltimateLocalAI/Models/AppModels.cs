@@ -20,6 +20,7 @@ public sealed class AppConfig
     public int EmbeddingPort { get; set; } = 8090;
     public string EmbeddingDocumentPrefix { get; set; } = "";
     public string EmbeddingQueryPrefix { get; set; } = "";
+    public string EmbeddingPooling { get; set; } = "Auto";
     public RuntimeSettings Runtime { get; set; } = new();
     public GenerationSettings Generation { get; set; } = new();
 }
@@ -288,6 +289,7 @@ public sealed class RagIndexManifest
     public string EmbeddingModelFingerprint { get; set; } = "";
     public string EmbeddingModelName { get; set; } = "";
     public string EmbeddingDocumentPrefix { get; set; } = "";
+    public string EmbeddingPooling { get; set; } = "Auto";
     public int VectorDimensions { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
