@@ -19,13 +19,14 @@ public sealed class RagDocumentExtractor
         string path,
         AppConfig config,
         IProgress<RagIndexProgress>? progress = null,
+        DocumentVisionSession? vision = null,
         CancellationToken ct = default)
     {
         if (!File.Exists(path))
             throw new FileNotFoundException("Файл не найден.", path);
 
         if (Path.GetExtension(path).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
-            return await ExtractPdfAsync(path, config, progress, ct);
+            return await ExtractPdfAsync(path, config, progress, vision, ct);
 
         var attachment = await _fallback.ExtractAsync(path);
         ct.ThrowIfCancellationRequested();
@@ -39,6 +40,7 @@ public sealed class RagDocumentExtractor
         string path,
         AppConfig config,
         IProgress<RagIndexProgress>? progress,
+        DocumentVisionSession? vision,
         CancellationToken ct)
     {
         progress?.Report(new RagIndexProgress
@@ -63,6 +65,9 @@ public sealed class RagDocumentExtractor
                     ExtractionMode = "Text"
                 });
             }
+
+            await AppendVisionSegmentsAsync(path, config, report, result, progress, vision, ct);
+            SortPageSegments(result);
             return result;
         }
 
@@ -78,6 +83,9 @@ public sealed class RagDocumentExtractor
                     ExtractionMode = page.Mode == "Text" ? "Text" : "WeakText"
                 });
             }
+
+            await AppendVisionSegmentsAsync(path, config, report, result, progress, vision, ct);
+            SortPageSegments(result);
             return result;
         }
 
@@ -124,7 +132,7 @@ public sealed class RagDocumentExtractor
                     tempDir);
 
                 OcrRecognitionResult recognized;
-                if (_configRestorationEnabled(config))
+                if (config.OcrRestorationEnabled)
                 {
                     var candidateDir = Path.Combine(tempDir, $"page-{page.PageNumber:D4}");
                     var candidates = _scanRestoration.BuildCandidates(
@@ -199,11 +207,122 @@ public sealed class RagDocumentExtractor
             _ => "Mixed text + OCR"
         };
 
+        await AppendVisionSegmentsAsync(path, config, report, result, progress, vision, ct);
+        SortPageSegments(result);
         return result;
     }
 
-    private static bool _configRestorationEnabled(AppConfig config) =>
-        config.OcrEnabled && config.OcrRestorationEnabled;
+    private async Task AppendVisionSegmentsAsync(
+        string path,
+        AppConfig config,
+        PdfScanReport report,
+        RagExtractionResult result,
+        IProgress<RagIndexProgress>? progress,
+        DocumentVisionSession? vision,
+        CancellationToken ct)
+    {
+        if (!config.DocumentVisionEnabled || vision is null || !vision.IsReady)
+            return;
+
+        var tempDir = Path.Combine(AppPaths.TempDir, "vision-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        report.VisionModelName = vision.ModelName;
+
+        try
+        {
+            foreach (var page in report.Pages)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var textContext = result.Segments
+                    .Where(x => x.PageNumber == page.PageNumber && !string.Equals(x.ExtractionMode, "Vision", StringComparison.OrdinalIgnoreCase))
+                    .Select(x => x.Content)
+                    .FirstOrDefault() ?? page.ExtractedText;
+
+                if (!config.DocumentVisionAnalyzeAllPages &&
+                    !ShouldAnalyzeVisualPage(textContext, page))
+                    continue;
+
+                progress?.Report(new RagIndexProgress
+                {
+                    Phase = "vision",
+                    FileName = Path.GetFileName(path),
+                    Completed = page.PageNumber,
+                    Total = report.PageCount,
+                    Message = $"Vision-анализ страницы {page.PageNumber}/{report.PageCount}…"
+                });
+
+                try
+                {
+                    var image = _pdfRenderer.RenderPageForVision(
+                        path,
+                        page.PageNumber,
+                        Math.Clamp(config.DocumentVisionDpi, 140, 320),
+                        tempDir);
+
+                    var analysis = await vision.AnalyzePageAsync(
+                        image,
+                        page.PageNumber,
+                        textContext,
+                        ct);
+
+                    page.VisionStatus = analysis.Status;
+                    page.VisionContent = analysis.Content;
+
+                    if (!analysis.HasVisualContent)
+                        continue;
+
+                    page.UsedVision = true;
+                    report.VisionPageCount++;
+
+                    result.Segments.Add(new RagSourceSegment
+                    {
+                        PageNumber = page.PageNumber,
+                        Section = "Визуальный анализ страницы",
+                        Content = analysis.Content,
+                        ExtractionMode = "Vision"
+                    });
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    page.VisionStatus = "Ошибка Vision: " + ex.Message;
+                    LogService.Warn($"Document Vision page {page.PageNumber}: {ex.Message}");
+                }
+            }
+        }
+        finally
+        {
+            try { Directory.Delete(tempDir, recursive: true); } catch { }
+        }
+    }
+
+    private static bool ShouldAnalyzeVisualPage(string? text, PdfPageScanInfo page)
+    {
+        if (page.Mode != "Text")
+            return true;
+
+        var value = text ?? "";
+        if (value.Length < 300)
+            return true;
+
+        return value.Contains("рис.", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("рисунок", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("figure", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("табл.", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("таблица", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("table", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("график", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("схем", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("=", StringComparison.Ordinal);
+    }
+
+    private static void SortPageSegments(RagExtractionResult result)
+    {
+        result.Segments = result.Segments
+            .OrderBy(x => x.PageNumber ?? int.MaxValue)
+            .ThenBy(x => string.Equals(x.ExtractionMode, "Vision", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+            .ToList();
+    }
 
     private static List<RagSourceSegment> SplitTextIntoSegments(string text)
     {
