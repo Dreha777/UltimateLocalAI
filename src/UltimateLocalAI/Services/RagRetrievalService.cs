@@ -216,7 +216,9 @@ public sealed class RagRetrievalService
                     PageTo = chunk.PageTo,
                     Score = score,
                     SemanticScore = score,
-                    RetrievalMethod = "semantic"
+                    RetrievalMethod = "semantic",
+                    ExtractionMode = chunk.ExtractionMode,
+                    OcrConfidence = chunk.OcrConfidence
                 };
 
                 if (queue.Count < topK)
@@ -303,7 +305,9 @@ public sealed class RagRetrievalService
         Score = source.Score,
         SemanticScore = source.SemanticScore,
         RerankScore = source.RerankScore,
-        RetrievalMethod = source.RetrievalMethod
+        RetrievalMethod = source.RetrievalMethod,
+        ExtractionMode = source.ExtractionMode,
+        OcrConfidence = source.OcrConfidence
     };
 
     private static AppConfig CloneConfigForEmbedding(AppConfig source, RagIndexManifest manifest) => new()
