@@ -1,7 +1,7 @@
 <Window x:Class="UltimateLocalAI.KnowledgeBaseWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Локальная база знаний / RAG" Width="1040" Height="850" MinWidth="900" MinHeight="700"
+        Title="Локальная база знаний / RAG" Width="1080" Height="960" MinWidth="920" MinHeight="760"
         WindowStartupLocation="CenterOwner" Background="{DynamicResource BgBrush}">
     <Grid Margin="18">
         <Grid.RowDefinitions>
@@ -13,14 +13,14 @@
 
         <StackPanel>
             <TextBlock Text="Локальная база знаний · RAG 2.0" FontSize="22" FontWeight="SemiBold"/>
-            <TextBlock Text="RAG 2.0: semantic search по локальным embeddings, опциональный reranker и передача лучших фрагментов chat-модели. Chat-модель можно менять свободно — библиотека связана только со своей embedding-моделью."
+            <TextBlock Text="RAG 2.0: текст/OCR + Document Vision для формул, таблиц, рисунков, схем и графиков; затем embeddings, semantic search и reranker. Chat-модель можно менять независимо."
                        TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" Margin="0,5,0,0"/>
         </StackPanel>
 
         <Border Grid.Row="1" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                 CornerRadius="12" Padding="12" Margin="0,14,0,12">
             <Grid>
-                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
 
                 <TextBlock Text="Embedding GGUF" FontWeight="SemiBold" VerticalAlignment="Center"/>
@@ -89,6 +89,31 @@
                     <TextBlock Text="Оригинал остаётся кандидатом; обработка применяется только при заметном улучшении OCR."
                                Foreground="{DynamicResource MutedBrush}" FontSize="9" VerticalAlignment="Center" Margin="14,0,0,0"/>
                 </StackPanel>
+
+                <TextBlock Grid.Row="9" Text="Vision GGUF" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,9,0,0"/>
+                <TextBox Grid.Row="9" Grid.Column="1" x:Name="VisionModelPathBox" IsReadOnly="True" Margin="0,9,0,0"
+                         ToolTip="Отдельная мультимодальная GGUF-модель для анализа страниц книги."/>
+                <Button Grid.Row="9" Grid.Column="3" Content="Выбрать…" Style="{StaticResource SoftButton}" Click="SelectVisionModel_Click" Margin="0,9,0,0"/>
+
+                <TextBlock Grid.Row="10" Text="Vision mmproj" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,8,0,0"/>
+                <TextBox Grid.Row="10" Grid.Column="1" x:Name="VisionMmprojPathBox" IsReadOnly="True" Margin="0,8,0,0"
+                         ToolTip="Multimodal projector GGUF, соответствующий выбранной vision-модели."/>
+                <Button Grid.Row="10" Grid.Column="3" Content="Выбрать…" Style="{StaticResource SoftButton}" Click="SelectVisionMmproj_Click" Margin="0,8,0,0"/>
+
+                <Grid Grid.Row="11" Grid.ColumnSpan="4" Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <CheckBox x:Name="VisionEnabledBox" Content="Document Vision" VerticalAlignment="Center"/>
+                    <CheckBox Grid.Column="1" x:Name="VisionAllPagesBox" Content="все страницы" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                    <CheckBox Grid.Column="2" x:Name="VisionGpuBox" Content="GPU" VerticalAlignment="Center" Margin="16,0,0,0"
+                              ToolTip="По умолчанию выключено, чтобы Document Vision не конкурировал за VRAM с chat-моделью."/>
+                    <TextBlock Grid.Column="3" Text="DPI:" Margin="16,0,4,0" VerticalAlignment="Center"/>
+                    <TextBox Grid.Column="4" x:Name="VisionDpiBox" Width="54"/>
+                    <TextBlock Grid.Column="5" x:Name="VisionStatusText" Foreground="{DynamicResource MutedBrush}" FontSize="9"
+                               VerticalAlignment="Center" Margin="14,0,0,0" TextWrapping="Wrap"/>
+                </Grid>
             </Grid>
         </Border>
 
