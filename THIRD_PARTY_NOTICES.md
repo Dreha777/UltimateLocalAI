@@ -48,6 +48,23 @@ Ultimate Local AI uses .NET 8 / WPF for the Windows graphical application and se
 - License: Apache-2.0
 - Purpose: page-aware text extraction from text-layer PDF documents for the local RAG index.
 
+## PdfiumRaster / PDFium / SkiaSharp
+
+- Package: PdfiumRaster 2.0.5
+- PdfiumRaster license: MIT
+- Purpose: local rendering of PDF pages to grayscale images for OCR diagnostics and recognition.
+- PdfiumRaster restores PDFium and SkiaSharp runtime assets through its NuGet dependency graph; those components retain their own upstream licenses.
+
+## TesseractOCR / Tesseract / tessdata_best
+
+- Package: TesseractOCR 5.5.2
+- TesseractOCR license: Apache-2.0
+- Tesseract OCR engine: Apache-2.0
+- Leptonica: BSD-style license
+- Bundled language data: rus.traineddata, eng.traineddata, osd.traineddata from tessdata_best
+- tessdata_best license: Apache-2.0
+- Purpose: fully local/offline OCR for scanned PDF pages. Language data are downloaded only during CI/build and are included in the resulting Portable/GUI patch; runtime OCR does not require Internet access.
+
 ## CUDA / Vulkan
 
 The build system can use NVIDIA CUDA Toolkit and LunarG Vulkan SDK to compile GPU-enabled llama.cpp backends. These SDKs are governed by their own vendor license terms.
