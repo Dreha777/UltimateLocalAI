@@ -20,7 +20,7 @@
         <Border Grid.Row="1" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                 CornerRadius="12" Padding="12" Margin="0,14,0,12">
             <Grid>
-                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
 
                 <TextBlock Text="Embedding GGUF" FontWeight="SemiBold" VerticalAlignment="Center"/>
@@ -80,6 +80,15 @@
                     <TextBlock Grid.Column="4" x:Name="OcrStatusText" Foreground="{DynamicResource MutedBrush}" FontSize="9" VerticalAlignment="Center" Margin="12,0"/>
                     <Button Grid.Column="5" x:Name="PdfScannerButton" Content="Сканер PDF" Style="{StaticResource SoftButton}" Click="PdfScanner_Click"/>
                 </Grid>
+
+                <StackPanel Grid.Row="8" Grid.ColumnSpan="4" Orientation="Horizontal" Margin="0,8,0,0">
+                    <CheckBox x:Name="OcrRestorationBox" Content="Восстанавливать старые сканы перед OCR" VerticalAlignment="Center"/>
+                    <TextBlock Text="Макс. deskew:" Margin="18,0,4,0" VerticalAlignment="Center"/>
+                    <TextBox x:Name="OcrMaxDeskewBox" Width="54"/>
+                    <TextBlock Text="°" VerticalAlignment="Center" Margin="3,0,0,0"/>
+                    <TextBlock Text="Оригинал остаётся кандидатом; обработка применяется только при заметном улучшении OCR."
+                               Foreground="{DynamicResource MutedBrush}" FontSize="9" VerticalAlignment="Center" Margin="14,0,0,0"/>
+                </StackPanel>
             </Grid>
         </Border>
 
