@@ -15,6 +15,7 @@ public sealed class AppConfig
     public bool AutoFallbackToCpu { get; set; } = true;
     public bool UseKnowledgeBase { get; set; } = false;
     public string WorkspaceBackground { get; set; } = "Светло-серый";
+    public List<string> ModelFolders { get; set; } = [];
     public RuntimeSettings Runtime { get; set; } = new();
     public GenerationSettings Generation { get; set; } = new();
 }
@@ -34,6 +35,7 @@ public sealed class RuntimeSettings
     public string ReasoningMode { get; set; } = "auto";
     public string ReasoningEffort { get; set; } = "default";
     public int Priority { get; set; } = 1;
+    public string AutoProfile { get; set; } = "Качество";
 }
 
 public sealed class GenerationSettings
@@ -181,6 +183,25 @@ public sealed class GgufModelMetadata
         Quantization.StartsWith("IQ3", StringComparison.OrdinalIgnoreCase) ||
         Quantization.StartsWith("TQ1", StringComparison.OrdinalIgnoreCase) ||
         Quantization.StartsWith("TQ2", StringComparison.OrdinalIgnoreCase);
+}
+
+public sealed class ModelCatalogItem
+{
+    public string FileName { get; set; } = "";
+    public string FullPath { get; set; } = "";
+    public long SizeBytes { get; set; }
+    public double SizeGb => SizeBytes / 1024d / 1024d / 1024d;
+    public string SizeText => $"{SizeGb:0.00} ГБ";
+    public string Architecture { get; set; } = "";
+    public string SizeLabel { get; set; } = "";
+    public string Quantization { get; set; } = "";
+    public long? NativeContextSize { get; set; }
+    public string NativeContextText => NativeContextSize is > 0 ? NativeContextSize.Value.ToString("N0") : "—";
+    public string Quality { get; set; } = "Не определено";
+    public string HardwareFit { get; set; } = "Не оценено";
+    public string Advice { get; set; } = "";
+    public int RecommendationRank { get; set; }
+    public bool IsCurrent { get; set; }
 }
 
 public sealed class BackendChoice
