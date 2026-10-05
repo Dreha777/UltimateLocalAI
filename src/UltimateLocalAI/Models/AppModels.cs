@@ -444,6 +444,7 @@ public sealed class PdfScanReport
     public int OcrPageCount { get; set; }
     public double OcrAverageConfidence { get; set; }
     public int VisionPageCount { get; set; }
+    public int VisionErrorCount { get; set; }
     public string VisionModelName { get; set; } = "";
     public string DocumentMode { get; set; } = "Text PDF";
     public List<PdfPageScanInfo> Pages { get; set; } = [];
