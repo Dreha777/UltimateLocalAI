@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - stage-7g-4-pdf-ocr
     paths-ignore:
       - '**/*.md'
 
