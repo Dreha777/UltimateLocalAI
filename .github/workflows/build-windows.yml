@@ -27,6 +27,12 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Prepare offline OCR assets
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy -Scope Process Bypass -Force
+          ./scripts/Prepare-OcrAssets.ps1
+
       - name: Restore GUI
         shell: pwsh
         run: dotnet restore src/UltimateLocalAI/UltimateLocalAI.csproj --configfile NuGet.config --ignore-failed-sources
@@ -63,6 +69,13 @@ jobs:
 
           if (Test-Path (Join-Path $guiDir "runtimes")) {
             Copy-Item (Join-Path $guiDir "runtimes") (Join-Path $patchDir "runtimes") -Recurse -Force
+          }
+
+          foreach ($dirName in @("Ocr", "x64", "x86", "arm64")) {
+            $sourceDir = Join-Path $guiDir $dirName
+            if (Test-Path $sourceDir) {
+              Copy-Item $sourceDir (Join-Path $patchDir $dirName) -Recurse -Force
+            }
           }
 
           foreach ($doc in @("FIRST_START_RU.txt", "USER_GUIDE_RU.txt", "THIRD_PARTY_NOTICES.md")) {
@@ -135,6 +148,12 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
+      - name: Prepare offline OCR assets
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy -Scope Process Bypass -Force
+          ./scripts/Prepare-OcrAssets.ps1
 
       - name: Install Vulkan SDK
         shell: pwsh
