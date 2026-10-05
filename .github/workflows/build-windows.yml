@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - stage-7g-1-vector-index
     paths-ignore:
       - '**/*.md'
 
