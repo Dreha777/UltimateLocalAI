@@ -31,6 +31,7 @@ public partial class KnowledgeBaseWindow : Window
         EmbeddingModelPathBox.Text = _config.EmbeddingModelPath;
         DocumentPrefixBox.Text = _config.EmbeddingDocumentPrefix;
         QueryPrefixBox.Text = _config.EmbeddingQueryPrefix;
+        SelectComboByText(PoolingBox, _config.EmbeddingPooling);
 
         Loaded += (_, _) => Refresh();
         Closed += (_, _) => _indexCts?.Cancel();
@@ -53,6 +54,7 @@ public partial class KnowledgeBaseWindow : Window
         _config.EmbeddingModelPath = EmbeddingModelPathBox.Text.Trim();
         _config.EmbeddingDocumentPrefix = DocumentPrefixBox.Text;
         _config.EmbeddingQueryPrefix = QueryPrefixBox.Text;
+        _config.EmbeddingPooling = (PoolingBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString() ?? "Auto";
         _configService.Save(_config);
     }
 
@@ -188,6 +190,19 @@ public partial class KnowledgeBaseWindow : Window
         {
             SetBusy(false);
         }
+    }
+
+    private static void SelectComboByText(System.Windows.Controls.ComboBox box, string? text)
+    {
+        foreach (var item in box.Items.OfType<System.Windows.Controls.ComboBoxItem>())
+        {
+            if (string.Equals(item.Content?.ToString(), text, StringComparison.OrdinalIgnoreCase))
+            {
+                box.SelectedItem = item;
+                return;
+            }
+        }
+        box.SelectedIndex = 0;
     }
 
     private void SetBusy(bool busy)
