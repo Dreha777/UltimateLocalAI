@@ -652,7 +652,7 @@ public partial class MainWindow : Window
                         Section = hit.Section,
                         PageFrom = hit.PageFrom,
                         PageTo = hit.PageTo,
-                        Snippet = CompactSourceSnippet(body, 1200),
+                        Snippet = body,
                         SemanticScore = hit.SemanticScore,
                         RerankScore = hit.RerankScore,
                         RetrievalMethod = hit.RetrievalMethod
@@ -1074,13 +1074,6 @@ public partial class MainWindow : Window
         RerankScore = source.RerankScore,
         RetrievalMethod = source.RetrievalMethod
     };
-
-    private static string CompactSourceSnippet(string? text, int maxChars)
-    {
-        var value = (text ?? "").Trim();
-        if (value.Length <= maxChars) return value;
-        return value[..Math.Max(1, maxChars - 1)].TrimEnd() + "…";
-    }
 
     private void PromptBox_PreviewKeyDown(object sender, KeyEventArgs e)
     {
