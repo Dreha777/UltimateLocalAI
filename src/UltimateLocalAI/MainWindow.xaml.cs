@@ -661,7 +661,7 @@ public partial class MainWindow : Window
 
         try
         {
-            ChatExportService.ExportByExtension(dlg.FileName, _currentChat.Title, Messages);
+            ChatExportService.ExportByExtension(dlg.FileName, _currentChat.Title ?? "Чат", Messages);
 
             RuntimeStatusText.Text = "Чат экспортирован";
             MessageBox.Show($"Чат сохранён:\n{dlg.FileName}", "Экспорт завершён",
