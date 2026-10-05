@@ -286,6 +286,7 @@ public sealed class RagDocumentExtractor
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     page.VisionStatus = "Ошибка Vision: " + ex.Message;
+                    report.VisionErrorCount++;
                     LogService.Warn($"Document Vision page {page.PageNumber}: {ex.Message}");
                 }
             }
