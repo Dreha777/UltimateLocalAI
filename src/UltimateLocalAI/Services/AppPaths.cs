@@ -9,6 +9,8 @@ public static class AppPaths
     public static string ConfigFile => Path.Combine(DataDir, "config.json");
     public static string ChatsFile => Path.Combine(DataDir, "chats.json");
     public static string KnowledgeFile => Path.Combine(DataDir, "knowledge.json");
+    public static string RagIndexDir => Path.Combine(DataDir, "RagIndex");
+    public static string RagManifestFile => Path.Combine(RagIndexDir, "manifest.json");
     public static string TempDir => Path.Combine(DataDir, "Temp");
     public static string BackupsDir => Path.Combine(DataDir, "Backups");
 
@@ -30,5 +32,6 @@ public static class AppPaths
         Directory.CreateDirectory(BackendsDir);
         Directory.CreateDirectory(TempDir);
         Directory.CreateDirectory(BackupsDir);
+        Directory.CreateDirectory(RagIndexDir);
     }
 }
