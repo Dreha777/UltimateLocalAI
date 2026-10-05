@@ -42,8 +42,8 @@ public sealed class AutoRuntimeConfigurator
 
         // When the user left the normal 4096 default and the machine clearly has headroom,
         // quality-first Auto may raise the context to 8192 by itself.
-        var nativeContext = metadata?.NativeContextSize is > 0
-            ? Math.Min(metadata.NativeContextSize.Value, 1_048_576L)
+        var nativeContext = metadata?.NativeContextSize is long native && native > 0
+            ? Math.Min(native, 1_048_576L)
             : 0L;
         var ampleSystemHeadroom = totalRamMb >= 32_000 &&
                                   availableRamMb >= 16_000 &&
@@ -53,7 +53,7 @@ public sealed class AutoRuntimeConfigurator
 
         if (nativeContext > 0 && context > nativeContext)
         {
-            context = (int)Math.Max(2_048L, nativeContext);
+            context = (int)Math.Max(512L, nativeContext);
             warnings.Add($"Контекст ограничен родным пределом модели: {nativeContext}.");
         }
 
