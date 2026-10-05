@@ -30,6 +30,8 @@ public sealed class AppConfig
     public int OcrDpi { get; set; } = 300;
     public double OcrMinConfidence { get; set; } = 0.45;
     public string OcrLanguages { get; set; } = "rus+eng";
+    public bool OcrRestorationEnabled { get; set; } = true;
+    public double OcrMaxDeskewDegrees { get; set; } = 12.0;
     public RuntimeSettings Runtime { get; set; } = new();
     public GenerationSettings Generation { get; set; } = new();
 }
@@ -400,7 +402,12 @@ public sealed class PdfPageScanInfo
     public string Reason { get; set; } = "";
     public string ExtractedText { get; set; } = "";
     public double OcrConfidence { get; set; }
+    public double RawOcrConfidence { get; set; }
     public bool UsedOcr { get; set; }
+    public bool UsedRestoration { get; set; }
+    public string RestorationVariant { get; set; } = "Original";
+    public double DeskewDegrees { get; set; }
+    public double RestorationScore { get; set; }
 }
 
 public sealed class PdfScanReport
