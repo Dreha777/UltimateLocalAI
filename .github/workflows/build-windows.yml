@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - stage-7e-1-export-theme
     paths-ignore:
       - '**/*.md'
 
