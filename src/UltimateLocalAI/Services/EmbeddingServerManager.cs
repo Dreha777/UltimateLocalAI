@@ -34,7 +34,9 @@ public sealed class EmbeddingServerManager : IAsyncDisposable
         Add(psi, "--host", "127.0.0.1");
         Add(psi, "--port", Math.Clamp(config.EmbeddingPort, 1024, 65535).ToString());
         Add(psi, "--embeddings");
-        Add(psi, "--pooling", "mean");
+        var pooling = NormalizePooling(config.EmbeddingPooling);
+        if (pooling is not null)
+            Add(psi, "--pooling", pooling);
         Add(psi, "-c", "2048");
         Add(psi, "-t", Math.Max(1, config.Runtime.Threads).ToString());
         Add(psi, "-tb", Math.Max(1, config.Runtime.ThreadsBatch).ToString());
@@ -131,6 +133,15 @@ public sealed class EmbeddingServerManager : IAsyncDisposable
             _process = null;
         }
     }
+
+    private static string? NormalizePooling(string? value) =>
+        value?.Trim().ToLowerInvariant() switch
+        {
+            "mean" => "mean",
+            "cls" => "cls",
+            "last" => "last",
+            _ => null
+        };
 
     private static void Add(ProcessStartInfo psi, string key, string? value = null)
     {
