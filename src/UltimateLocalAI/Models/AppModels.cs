@@ -150,6 +150,39 @@ public sealed class ModelServerProperties
         ChatTemplate.Contains("think", StringComparison.OrdinalIgnoreCase);
 }
 
+public sealed class GgufModelMetadata
+{
+    public bool IsValid { get; set; }
+    public uint Version { get; set; }
+    public string Name { get; set; } = "";
+    public string Architecture { get; set; } = "";
+    public string SizeLabel { get; set; } = "";
+    public int? FileTypeCode { get; set; }
+    public string Quantization { get; set; } = "";
+    public long? NativeContextSize { get; set; }
+
+    public double? RecommendedTemperature { get; set; }
+    public double? RecommendedTopP { get; set; }
+    public int? RecommendedTopK { get; set; }
+    public double? RecommendedMinP { get; set; }
+    public double? RecommendedRepeatPenalty { get; set; }
+
+    public bool HasRecommendedSampling =>
+        RecommendedTemperature.HasValue || RecommendedTopP.HasValue ||
+        RecommendedTopK.HasValue || RecommendedMinP.HasValue ||
+        RecommendedRepeatPenalty.HasValue;
+
+    public bool IsAggressivelyQuantized =>
+        Quantization.StartsWith("Q1", StringComparison.OrdinalIgnoreCase) ||
+        Quantization.StartsWith("Q2", StringComparison.OrdinalIgnoreCase) ||
+        Quantization.StartsWith("Q3", StringComparison.OrdinalIgnoreCase) ||
+        Quantization.StartsWith("IQ1", StringComparison.OrdinalIgnoreCase) ||
+        Quantization.StartsWith("IQ2", StringComparison.OrdinalIgnoreCase) ||
+        Quantization.StartsWith("IQ3", StringComparison.OrdinalIgnoreCase) ||
+        Quantization.StartsWith("TQ1", StringComparison.OrdinalIgnoreCase) ||
+        Quantization.StartsWith("TQ2", StringComparison.OrdinalIgnoreCase);
+}
+
 public sealed class BackendChoice
 {
     public string Name { get; set; } = "";
