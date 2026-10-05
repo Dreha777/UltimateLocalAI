@@ -92,21 +92,35 @@ public sealed class RagRetrievalService
 
                 if (ranked.Count > 0)
                 {
-                    final = ranked
-                        .Where(x => x.Index >= 0 && x.Index < candidates.Count)
-                        .Select(x =>
-                        {
-                            var hit = CloneHit(candidates[x.Index]);
-                            hit.RerankScore = x.Score;
-                            hit.Score = x.Score;
-                            hit.RetrievalMethod = "semantic + reranker";
-                            return hit;
-                        })
-                        .Take(finalTopK)
-                        .ToList();
+                    var maxAbsScore = ranked.Max(x => Math.Abs(x.Score));
+                    var scoreSpread = ranked.Max(x => x.Score) - ranked.Min(x => x.Score);
 
-                    retrieval.Diagnostics.UsedReranker = true;
-                    retrieval.Diagnostics.Status = "Semantic search + reranker";
+                    // Some incorrectly converted reranker GGUFs expose the endpoint but
+                    // return ~0 for every candidate. Treat that as an unhealthy reranker
+                    // and preserve the semantic ordering instead of degrading retrieval.
+                    if (maxAbsScore < 1e-12 || (ranked.Count > 2 && Math.Abs(scoreSpread) < 1e-14))
+                    {
+                        LogService.Warn("RAG reranker returned degenerate scores; semantic ranking preserved.");
+                        retrieval.Diagnostics.Status = "Semantic search; reranker дал вырожденные оценки.";
+                    }
+                    else
+                    {
+                        final = ranked
+                            .Where(x => x.Index >= 0 && x.Index < candidates.Count)
+                            .Select(x =>
+                            {
+                                var hit = CloneHit(candidates[x.Index]);
+                                hit.RerankScore = x.Score;
+                                hit.Score = x.Score;
+                                hit.RetrievalMethod = "semantic + reranker";
+                                return hit;
+                            })
+                            .Take(finalTopK)
+                            .ToList();
+
+                        retrieval.Diagnostics.UsedReranker = true;
+                        retrieval.Diagnostics.Status = "Semantic search + reranker";
+                    }
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
