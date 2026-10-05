@@ -655,35 +655,40 @@ public partial class MainWindow : Window
         if (_modelFileMetadata.IsValid)
         {
             if (Nearly(source.Temperature, 0.7) &&
-                _modelFileMetadata.RecommendedTemperature is >= 0 and <= 2 is var metaTemp)
+                _modelFileMetadata.RecommendedTemperature is double metaTemp &&
+                metaTemp is >= 0 and <= 2)
             {
                 result.Temperature = metaTemp;
                 samplingChanges.Add($"temp {source.Temperature:0.###}->{result.Temperature:0.###}");
             }
 
             if (Nearly(source.TopP, 0.95) &&
-                _modelFileMetadata.RecommendedTopP is >= 0 and <= 1 is var metaTopP)
+                _modelFileMetadata.RecommendedTopP is double metaTopP &&
+                metaTopP is >= 0 and <= 1)
             {
                 result.TopP = metaTopP;
                 samplingChanges.Add($"top_p {source.TopP:0.###}->{result.TopP:0.###}");
             }
 
             if (source.TopK == 40 &&
-                _modelFileMetadata.RecommendedTopK is >= 0 and <= 1000 is var metaTopK)
+                _modelFileMetadata.RecommendedTopK is int metaTopK &&
+                metaTopK is >= 0 and <= 1000)
             {
                 result.TopK = metaTopK;
                 samplingChanges.Add($"top_k {source.TopK}->{result.TopK}");
             }
 
             if (Nearly(source.MinP, 0.05) &&
-                _modelFileMetadata.RecommendedMinP is >= 0 and <= 1 is var metaMinP)
+                _modelFileMetadata.RecommendedMinP is double metaMinP &&
+                metaMinP is >= 0 and <= 1)
             {
                 result.MinP = metaMinP;
                 samplingChanges.Add($"min_p {source.MinP:0.###}->{result.MinP:0.###}");
             }
 
             if (Nearly(source.RepeatPenalty, 1.05) &&
-                _modelFileMetadata.RecommendedRepeatPenalty is >= 0.5 and <= 2 is var metaRepeat)
+                _modelFileMetadata.RecommendedRepeatPenalty is double metaRepeat &&
+                metaRepeat is >= 0.5 and <= 2)
             {
                 result.RepeatPenalty = metaRepeat;
                 samplingChanges.Add($"repeat {source.RepeatPenalty:0.###}->{result.RepeatPenalty:0.###}");
