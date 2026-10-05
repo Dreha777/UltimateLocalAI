@@ -4,6 +4,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
+using MigraDoc;
 using MigraDoc.DocumentObjectModel;
 using MigraDoc.Rendering;
 using MigraDoc.RtfRendering;
@@ -90,8 +91,9 @@ public static class ChatExportService
     {
         using var document = WordprocessingDocument.Create(path, WordprocessingDocumentType.Document);
         var mainPart = document.AddMainDocumentPart();
-        mainPart.Document = new W.Document();
-        var body = mainPart.Document.AppendChild(new W.Body());
+        var body = new W.Body();
+        var wordDocument = new W.Document(body);
+        mainPart.Document = wordDocument;
 
         AddWordParagraph(body, title, 34, bold: true, font: "Arial");
         AddWordParagraph(body, $"Экспортировано из Ultimate Local AI · {DateTime.Now:dd.MM.yyyy HH:mm}", 17, font: "Arial");
@@ -106,7 +108,7 @@ public static class ChatExportService
                 AddWordParagraph(body, message.AttachmentSummary, 17, font: "Arial");
         }
 
-        mainPart.Document.Save();
+        wordDocument.Save();
     }
 
     public static void ExportText(string path, string title, IEnumerable<UiMessage> messages)
