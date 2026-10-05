@@ -136,6 +136,8 @@ public sealed class RagSourceCitation
     public double SemanticScore { get; set; }
     public double? RerankScore { get; set; }
     public string RetrievalMethod { get; set; } = "";
+    public string ExtractionMode { get; set; } = "";
+    public double OcrConfidence { get; set; }
 
     public string PageLabel => PageFrom.HasValue
         ? PageTo.HasValue && PageTo != PageFrom ? $"стр. {PageFrom}–{PageTo}" : $"стр. {PageFrom}"
@@ -292,6 +294,8 @@ public sealed class KnowledgeHit
     public double SemanticScore { get; set; }
     public double? RerankScore { get; set; }
     public string RetrievalMethod { get; set; } = "";
+    public string ExtractionMode { get; set; } = "";
+    public double OcrConfidence { get; set; }
     public string PageLabel => PageFrom.HasValue
         ? PageTo.HasValue && PageTo != PageFrom ? $"стр. {PageFrom}–{PageTo}" : $"стр. {PageFrom}"
         : "";
@@ -330,6 +334,7 @@ public sealed class RagIndexedDocument
     public long SourceSizeBytes { get; set; }
     public DateTime SourceLastWriteUtc { get; set; }
     public string SourceSha256 { get; set; } = "";
+    public string ExtractionFingerprint { get; set; } = "";
     public int PageCount { get; set; }
     public int ChunkCount { get; set; }
     public string ChunkFile { get; set; } = "";
