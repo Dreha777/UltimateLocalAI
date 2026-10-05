@@ -38,6 +38,10 @@ public partial class KnowledgeBaseWindow : Window
         FinalTopKBox.Text = _config.RagFinalTopK.ToString();
 
         Loaded += (_, _) => Refresh();
+        Closing += (_, _) =>
+        {
+            try { SaveEmbeddingSettings(); } catch { }
+        };
         Closed += (_, _) => _indexCts?.Cancel();
     }
 
@@ -51,9 +55,10 @@ public partial class KnowledgeBaseWindow : Window
             : manifest.EmbeddingModelName;
         var dims = manifest.VectorDimensions > 0 ? $" · {manifest.VectorDimensions} dim" : "";
         IndexInfoText.Text = $"Документов: {manifest.Documents.Count} · embedding индекса: {model}{dims}";
+        var chatName = File.Exists(_config.ModelPath) ? Path.GetFileName(_config.ModelPath) : "не выбрана";
         ModelIndependenceText.Text = manifest.Documents.Count == 0
-            ? "Индекс ещё пуст. После первой индексации выбранная embedding-модель фиксирует векторное пространство библиотеки."
-            : $"Эта библиотека создана embedding-моделью «{manifest.EmbeddingModelName}». Chat-модель можно менять без переиндексации. Reranker тоже можно менять. Смена embedding-модели, document prefix или pooling требует перестроить индекс.";
+            ? $"Chat-модель: {chatName}. Индекс ещё пуст. После первой индексации embedding-модель фиксирует векторное пространство библиотеки."
+            : $"Chat-модель: {chatName} — её можно менять свободно. Библиотека создана embedding-моделью «{manifest.EmbeddingModelName}» и остаётся с ней. Reranker тоже можно менять без переиндексации. Только смена embedding-модели, document prefix или pooling требует перестроить индекс.";
     }
 
     private void SaveEmbeddingSettings()
