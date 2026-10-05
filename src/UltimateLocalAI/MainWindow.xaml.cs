@@ -51,6 +51,8 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = this;
         _config = _configService.Load();
+        _config.ModelFolders ??= [];
+        _config.Runtime.AutoProfile = NormalizeAutoProfile(_config.Runtime.AutoProfile);
         _activeContextSize = Math.Max(512, _config.Runtime.ContextSize);
         _knowledge = new KnowledgeBaseService(_extractor);
         _server.StatusChanged += s => Dispatcher.Invoke(() =>
@@ -231,6 +233,12 @@ public partial class MainWindow : Window
         if (File.Exists(_config.ModelPath)) dlg.InitialDirectory = Path.GetDirectoryName(_config.ModelPath);
         if (dlg.ShowDialog(this) != true) return;
         _config.ModelPath = dlg.FileName;
+        var selectedFolder = Path.GetDirectoryName(dlg.FileName);
+        if (!string.IsNullOrWhiteSpace(selectedFolder) &&
+            !_config.ModelFolders.Contains(selectedFolder, StringComparer.OrdinalIgnoreCase))
+        {
+            _config.ModelFolders.Add(selectedFolder);
+        }
         _configService.Save(_config);
         if (_currentChat is not null)
         {
@@ -440,9 +448,71 @@ public partial class MainWindow : Window
             AutoFallbackToCpu = _config.AutoFallbackToCpu,
             UseKnowledgeBase = _config.UseKnowledgeBase,
             WorkspaceBackground = _config.WorkspaceBackground,
+            ModelFolders = _config.ModelFolders.ToList(),
             Runtime = profile.Runtime,
             Generation = _config.Generation
         };
+    }
+
+    private async void Models_Click(object sender, RoutedEventArgs e)
+    {
+        HardwareDetector.RefreshMemory(_hardware);
+
+        var win = new ModelManagerWindow(
+            _config.ModelFolders ?? [],
+            _hardware,
+            _config.ModelPath,
+            NormalizeAutoProfile(_config.Runtime.AutoProfile))
+        {
+            Owner = this
+        };
+
+        if (win.ShowDialog() != true)
+            return;
+
+        _config.ModelFolders = win.ModelFolders
+            .Where(Directory.Exists)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        _config.Runtime.AutoProfile = NormalizeAutoProfile(win.SelectedAutoProfile);
+
+        var selected = win.SelectedModelPath;
+        var modelChanged = !string.IsNullOrWhiteSpace(selected) &&
+                           !string.Equals(Path.GetFullPath(selected), SafeFullPath(_config.ModelPath), StringComparison.OrdinalIgnoreCase);
+
+        if (modelChanged)
+        {
+            _generationCts?.Cancel();
+            if (_server.IsRunning)
+            {
+                RuntimeStatusText.Text = "Смена модели: остановка текущего backend…";
+                await _server.StopAsync();
+            }
+
+            _modelReady = false;
+            _modelProperties = null;
+            _modelFileMetadata = new GgufModelMetadata();
+            _modelDiagnosticSummary = "";
+            _autoRuntimeWarning = "";
+            SendButton.IsEnabled = false;
+            UnloadButton.IsEnabled = false;
+            StartButton.Content = "Запустить";
+
+            _config.ModelPath = selected!;
+            if (_currentChat is not null)
+            {
+                _currentChat.ModelPath = selected!;
+                _chatRepo.UpdateModelPath(_currentChat.Id, selected!);
+            }
+        }
+
+        _configService.Save(_config);
+        LoadSettingsToUi();
+        RefreshModelHeader();
+
+        RuntimeStatusText.Text = modelChanged
+            ? $"Выбрана модель · Auto: {_config.Runtime.AutoProfile}"
+            : $"Настройки каталога сохранены · Auto: {_config.Runtime.AutoProfile}";
     }
 
     private async void Attach_Click(object sender, RoutedEventArgs e)
@@ -698,20 +768,38 @@ public partial class MainWindow : Window
         if (samplingChanges.Count > 0)
             LogService.Info("QUALITY-SAMPLING GGUF recommendations: " + string.Join(", ", samplingChanges));
 
-        var recommended = _activeContextSize >= 8_192 ? 4_096
-            : _activeContextSize >= 4_096 ? 2_048
-            : Math.Max(768, _activeContextSize / 2);
+        var autoProfile = NormalizeAutoProfile(_config.Runtime.AutoProfile);
+        var reasoning = _modelProperties?.SupportsReasoning ?? false;
+        var hardCap = Math.Max(512, _activeContextSize - 768);
 
-        var qualityNeedsMoreRoom = (_modelProperties?.SupportsReasoning ?? false) || source.MaxTokens <= 1_024;
-        if (qualityNeedsMoreRoom)
+        int recommended;
+        bool expandDefaultLimit;
+        if (autoProfile == "Экономия")
         {
-            var hardCap = Math.Max(512, _activeContextSize - 768);
-            result.MaxTokens = Math.Min(Math.Max(source.MaxTokens, recommended), hardCap);
+            recommended = reasoning ? Math.Min(1_536, Math.Max(768, _activeContextSize / 3)) : 1_024;
+            expandDefaultLimit = reasoning && source.MaxTokens <= 1_024;
         }
+        else if (autoProfile == "Баланс")
+        {
+            recommended = _activeContextSize >= 8_192 ? 2_048
+                : _activeContextSize >= 4_096 ? 1_536
+                : Math.Max(768, _activeContextSize / 2);
+            expandDefaultLimit = reasoning || source.MaxTokens <= 1_024;
+        }
+        else
+        {
+            recommended = _activeContextSize >= 8_192 ? 4_096
+                : _activeContextSize >= 4_096 ? 2_048
+                : Math.Max(768, _activeContextSize / 2);
+            expandDefaultLimit = reasoning || source.MaxTokens <= 1_024;
+        }
+
+        if (expandDefaultLimit)
+            result.MaxTokens = Math.Min(Math.Max(source.MaxTokens, recommended), hardCap);
 
         if (result.MaxTokens != source.MaxTokens)
         {
-            LogService.Info($"QUALITY-GENERATION max_tokens={source.MaxTokens}->{result.MaxTokens} context={_activeContextSize} reasoning={_modelProperties?.SupportsReasoning == true}");
+            LogService.Info($"QUALITY-GENERATION profile=\"{autoProfile}\" max_tokens={source.MaxTokens}->{result.MaxTokens} context={_activeContextSize} reasoning={reasoning}");
         }
 
         return result;
@@ -1067,6 +1155,7 @@ public partial class MainWindow : Window
         RuntimeChannelBox.SelectedItem = RuntimeChannels.Contains(_config.RuntimeChannel) ? _config.RuntimeChannel : "Stable";
         CustomRuntimePathBox.Text = _config.CustomRuntimePath;
         BackendModeBox.SelectedItem = BackendModes.Contains(_config.BackendMode) ? _config.BackendMode : "Auto";
+        SelectComboByText(AutoProfileBox, NormalizeAutoProfile(_config.Runtime.AutoProfile));
         ContextBox.Text = _config.Runtime.ContextSize.ToString();
         ThreadsBox.Text = _config.Runtime.Threads.ToString();
         ThreadsBatchBox.Text = _config.Runtime.ThreadsBatch.ToString();
@@ -1095,6 +1184,7 @@ public partial class MainWindow : Window
         _config.RuntimeChannel = RuntimeChannelBox.SelectedItem?.ToString() ?? "Stable";
         _config.CustomRuntimePath = CustomRuntimePathBox.Text.Trim();
         _config.BackendMode = BackendModeBox.SelectedItem?.ToString() ?? "Auto";
+        _config.Runtime.AutoProfile = NormalizeAutoProfile((AutoProfileBox.SelectedItem as ComboBoxItem)?.Content?.ToString());
         _config.Runtime.ContextSize = ParseInt(ContextBox.Text, _config.Runtime.ContextSize, 512, 1_048_576);
         _config.Runtime.Threads = ParseInt(ThreadsBox.Text, _config.Runtime.Threads, 1, 512);
         _config.Runtime.ThreadsBatch = ParseInt(ThreadsBatchBox.Text, _config.Runtime.ThreadsBatch, 1, 512);
@@ -1134,7 +1224,8 @@ public partial class MainWindow : Window
             ContextSize = _hardware.TotalRamMb > 24_000 ? 8192 : 4096,
             Threads = Math.Max(1, _hardware.LogicalProcessors - 2),
             ThreadsBatch = Math.Max(1, _hardware.LogicalProcessors),
-            GpuLayers = "auto", BatchSize = 512, UBatchSize = 256, FlashAttention = "auto", CacheTypeK = "q8_0", CacheTypeV = "q8_0"
+            GpuLayers = "auto", BatchSize = 512, UBatchSize = 256, FlashAttention = "auto", CacheTypeK = "q8_0", CacheTypeV = "q8_0",
+            AutoProfile = "Качество"
         };
         _config.Generation = new GenerationSettings();
         _config.BackendMode = "Auto";
@@ -1188,6 +1279,21 @@ public partial class MainWindow : Window
     {
         var win = new KnowledgeBaseWindow(_knowledge) { Owner = this };
         win.ShowDialog();
+    }
+
+    private static string NormalizeAutoProfile(string? value) =>
+        value?.Trim() switch
+        {
+            "Баланс" => "Баланс",
+            "Экономия" => "Экономия",
+            _ => "Качество"
+        };
+
+    private static string SafeFullPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return "";
+        try { return Path.GetFullPath(path); }
+        catch { return path; }
     }
 
     private static int ParseInt(string? text, int fallback, int min, int max) => int.TryParse(text, out var v) ? Math.Clamp(v, min, max) : fallback;
